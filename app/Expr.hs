@@ -9,4 +9,5 @@ data Expr where
     App        :: Expr -> Expr -> Expr
     Gensym     :: String -> Int -> Expr
     Definition  :: String -> Expr -> Expr
+    Let :: String -> Expr -> Expr ->  Expr -> Expr -- let x : A = t; u
     Dummy      :: Expr deriving (Eq, Show)

@@ -162,7 +162,7 @@ printInferredType ctx expr = do
 main :: IO ()
 main = do
     -- let input = "Define A : Type 0"
-    let input = "\\a : A . a"
+    let input = "let f : A = \\a : A . a; f x"
     case parse parseExpr "" input of
         Left err   -> putStrLn $ errorBundlePretty err
         Right expr -> print expr

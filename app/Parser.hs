@@ -39,8 +39,6 @@ identifier = (lexeme . try) (p >>= check)
               else return x
 
 
-parseVariable :: Parser Expr
-parseVariable = Var <$> identifier
 
 parseDefinition :: Parser Expr
 parseDefinition = do
@@ -49,6 +47,27 @@ parseDefinition = do
     _ <- symbol ":"
     ty <- parseUniverse
     return $ Definition id ty
+
+parseLet :: Parser Expr
+parseLet = do
+    l <- reservedWord "let"
+    x <- pBind
+    symbol ":"
+    a <- parseExpr
+    symbol "="
+    t <- parseExpr
+    symbol ";"
+    u <- parseExpr
+    pure $ Let x a t u
+
+pBind :: Parser String
+pBind = identifier <|> symbol "_"
+
+parseVariable :: Parser Expr
+parseVariable = Var <$> identifier
+
+parseSpine :: Parser Expr
+parseSpine = foldl1 App <$> some parseVariable
 
 parseLambda :: Parser Expr
 parseLambda = do
@@ -69,4 +88,4 @@ parseUniverse = do
 
 
 parseExpr :: Parser Expr
-parseExpr = parseLambda <|> parseDefinition <|> parseVariable
+parseExpr = parseLet <|> parseLambda <|> parseSpine <|> parseDefinition
