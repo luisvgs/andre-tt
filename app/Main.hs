@@ -1,13 +1,18 @@
 module Main where
 import           Control.Monad.State
 import           Data.Maybe          (fromMaybe)
+import           Debug.Trace         (trace)
 import           Expr                (Expr (..))
 import           Parser
 import           Text.Megaparsec     (Parsec, errorBundlePretty, parse)
 
+
 type Variable = String
 
 type Context = [(Variable, (Expr, Maybe Expr))]
+
+emptyCtx :: Context
+emptyCtx = [("A", (Universe 0, Nothing)), ("x", (Var "A", Nothing))]
 
 lookupTy :: Variable -> Context -> Maybe Expr
 lookupTy x ctx = fmap fst (lookup x ctx)
@@ -45,7 +50,9 @@ substAbstraction s (x, t, e) = do
     return (x', t', e')
 
 infer :: Context -> Expr -> Expr
-infer ctx (Var x)      = fromMaybe (error "Unknown identifier") (lookupTy x ctx)
+infer ctx (Var x) =
+    let inferredType = fromMaybe (error "Unknown identifier: ") (lookupTy x ctx)
+    in trace ("Inferred type of " ++ x ++ " is: " ++ prettyPrint inferredType) inferredType
 infer ctx (Universe k) = Universe ( k + 1 )
 infer ctx (Pi x t1 t2) =
     let k1 = inferUniverse ctx t1
@@ -55,7 +62,24 @@ infer ctx (Lambda x t e) =
     let t1 = inferUniverse ctx t
         te = infer (extend x t Nothing ctx) e
     in Pi x t te
-
+infer ctx (App e1 e2) = -- to infer App e1 e2
+    let (x, t1, t2) = inferPi ctx e1 -- one first should assert that e1 is Pi
+        t1' = infer ctx e2  -- And e2 as the same type as e1's domain
+    in if equal ctx t1 t1'
+       then evalState (subst [(x, e2)] t2) 0  -- Substitute e2 for x in t2
+       else error "Type mismatch in application"
+infer ctx (Let x t e1 e2) =
+    let t1 = infer ctx e1  -- Infer the type of e1
+    in trace ("Let: declared type = " ++ prettyPrint t ++
+              ", inferred type of e1 = " ++ prettyPrint t1 ++
+              ", context = " ++ show ctx) $
+       if equal ctx t t1
+       then let newCtx = extend x t (Just e1) ctx
+            in trace ("Extended context = " ++ show newCtx ++ " AAAA equal" ++ show t ++ " " ++ show t1) $
+               infer newCtx e2  -- Extend context with x: t = e1 and infer e2
+       else
+       trace ("Failed because "++ show t ++ " not equal " ++ show t1) $
+           error "Type mismatch in let expression"
 
 inferUniverse :: Context -> Expr -> Int
 inferUniverse ctx t =
@@ -70,10 +94,10 @@ inferPi ctx e =
         _          -> error "Function expected"
 
 normalize :: Context -> Expr -> Expr
-normalize ctx (Var x) = case lookupVal x ctx of
-    Just (Just e) -> normalize ctx e
-    Just Nothing  -> Var x
-    Nothing       -> Var x
+normalize ctx (Var x) =
+    case lookupTy x ctx of
+        Just t  -> normalize ctx t
+        Nothing -> Var x
 normalize ctx (Pi x t e) =
     let (x', t', e') = normalizeAbstraction ctx (x, t, e)
     in Pi x' t' e'
@@ -128,18 +152,12 @@ test3 = do
         lam = Lambda "x" t e
     print $ infer ctx lam -- Should output Pi "x" (Universe 0) (Universe 0)
 
-
--- Define the identity function
-identityType :: Expr
-identityType = Pi "A" (Universe 0) (Pi "x" (Var "A") (Var "A"))
-
-identityFunction :: Expr
-identityFunction = Lambda "A" (Universe 0) (Lambda "x" (Var "A") (Var "x"))
+testLet :: Expr
+testLet = Let "f" (Pi "a" (Var "A") (Var "A")) (Lambda "a" (Var "A") (Var "a")) (App (Var "f") (Var "x"))
 
 testIdentity :: IO ()
 testIdentity = do
-    let ctx = []
-    printInferredType ctx identityType
+    printInferredType emptyCtx testLet
 
 prettyPrint :: Expr -> String
 prettyPrint (Var x) = x
@@ -156,13 +174,20 @@ printInferredType ctx expr = do
     putStrLn $ "type: " ++ prettyPrint inferredType
 
 -- TODO:
--- Write some tests
--- Write a proper REPL
+    -- Infer application
+    -- Test identity with base types
+    -- Test basic operations
+    -- eval function: extend the context when defining new types
+    -- Write some tests
+    -- Write a proper REPL
+asu :: Expr
+asu = Let "f" (Var "A") (Var "A") (Var "f")
 
 main :: IO ()
 main = do
     -- let input = "Define A : Type 0"
     let input = "let f : A = \\a : A . a; f x"
+    -- let input = "let f : A = A; f"
     case parse parseExpr "" input of
         Left err   -> putStrLn $ errorBundlePretty err
         Right expr -> print expr
