@@ -161,6 +161,7 @@ testIdentity = do
 
 prettyPrint :: Expr -> String
 prettyPrint (Var x) = x
+prettyPrint (Let x t e u) = "let " ++ x ++ " : " ++ prettyPrint t ++ " = " ++ prettyPrint e ++ "; " ++ prettyPrint u
 prettyPrint (Universe k) = "Type" ++ show k
 prettyPrint (Pi x t e) = "Pi (" ++ x ++ " : " ++ prettyPrint t ++ ") -> " ++ prettyPrint e
 prettyPrint (Lambda x t e) = "Lambda (" ++ x ++ " : " ++ prettyPrint t ++ ") -> " ++ prettyPrint e
