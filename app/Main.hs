@@ -52,7 +52,7 @@ substAbstraction s (x, t, e) = do
 infer :: Context -> Expr -> Expr
 infer ctx (Var x) =
     let inferredType = fromMaybe (error "Unknown identifier: ") (lookupTy x ctx)
-    in trace ("Inferred type of " ++ x ++ " is: " ++ prettyPrint inferredType) inferredType
+    in trace ("Inferred type of " ++ x ++ " is: " ++ show inferredType) inferredType
 infer ctx (Universe k) = Universe ( k + 1 )
 infer ctx (Pi x t1 t2) =
     let k1 = inferUniverse ctx t1
@@ -70,8 +70,8 @@ infer ctx (App e1 e2) = -- to infer App e1 e2
        else error "Type mismatch in application"
 infer ctx (Let x t e1 e2) =
     let t1 = infer ctx e1  -- Infer the type of e1
-    in trace ("Let: declared type = " ++ prettyPrint t ++
-              ", inferred type of e1 = " ++ prettyPrint t1 ++
+    in trace ("Let: declared type = " ++ show t ++
+              ", inferred type of e1 = " ++ show t1 ++
               ", context = " ++ show ctx) $
        if equal ctx t t1
        then let newCtx = extend x t (Just e1) ctx
@@ -159,20 +159,10 @@ testIdentity :: IO ()
 testIdentity = do
     printInferredType emptyCtx testLet
 
-prettyPrint :: Expr -> String
-prettyPrint (Var x) = x
-prettyPrint (Let x t e u) = "let " ++ x ++ " : " ++ prettyPrint t ++ " = " ++ prettyPrint e ++ "; " ++ prettyPrint u
-prettyPrint (Universe k) = "Type" ++ show k
-prettyPrint (Pi x t e) = "Pi (" ++ x ++ " : " ++ prettyPrint t ++ ") -> " ++ prettyPrint e
-prettyPrint (Lambda x t e) = "Lambda (" ++ x ++ " : " ++ prettyPrint t ++ ") -> " ++ prettyPrint e
-prettyPrint (App e1 e2) = "(" ++ prettyPrint e1 ++ " " ++ prettyPrint e2 ++ ")"
-prettyPrint (Gensym s n) = s ++ show n
-prettyPrint Dummy = "Dummy"
-
 printInferredType :: Context -> Expr -> IO ()
 printInferredType ctx expr = do
     let inferredType = infer ctx expr
-    putStrLn $ "type: " ++ prettyPrint inferredType
+    putStrLn $ "type: " ++ show inferredType
 
 -- TODO:
     -- Infer application
