@@ -46,6 +46,7 @@ parseDefinition = do
     id <- identifier
     _ <- symbol ":"
     ty <- parseUniverse
+    _ <- symbol "."
     return $ Definition id ty
 
 parseLet :: Parser Expr
