@@ -12,7 +12,7 @@ type Variable = String
 type Context = [(Variable, (Expr, Maybe Expr))]
 
 emptyCtx :: Context
-emptyCtx = [("A", (Universe 0, Nothing)), ("x", (Var "A", Nothing))]
+emptyCtx = [("A", (Universe 0, Nothing)), ("x", (Var "A", Nothing)), ("B", (Universe 1, Nothing))]
 
 lookupTy :: Variable -> Context -> Maybe Expr
 lookupTy x ctx = fmap fst (lookup x ctx)
@@ -62,21 +62,21 @@ infer ctx (Lambda x t e) =
     let t1 = inferUniverse ctx t
         te = infer (extend x t Nothing ctx) e
     in Pi x t te
-infer ctx (App e1 e2) = -- to infer App e1 e2
-    let (x, t1, t2) = inferPi ctx e1 -- one first should assert that e1 is Pi
-        t1' = infer ctx e2  -- And e2 as the same type as e1's domain
+infer ctx (App e1 e2) =
+    let (x, t1, t2) = inferPi ctx e1
+        t1' = infer ctx e2
     in if equal ctx t1 t1'
-       then evalState (subst [(x, e2)] t2) 0  -- Substitute e2 for x in t2
+       then evalState (subst [(x, e2)] t2) 0
        else error "Type mismatch in application"
 infer ctx (Let x t e1 e2) =
-    let t1 = infer ctx e1  -- Infer the type of e1
+    let t1 = infer ctx e1
     in trace ("Let: declared type = " ++ show t ++
               ", inferred type of e1 = " ++ show t1 ++
               ", context = " ++ show ctx) $
        if equal ctx t t1
        then let newCtx = extend x t (Just e1) ctx
             in trace ("Extended context = " ++ show newCtx ++ " AAAA equal" ++ show t ++ " " ++ show t1) $
-               infer newCtx e2  -- Extend context with x: t = e1 and infer e2
+               infer newCtx e2
        else
        trace ("Failed because "++ show t ++ " not equal " ++ show t1) $
            error "Type mismatch in let expression"
@@ -132,8 +132,6 @@ equal ctx e1 e2 =
             equal' t1 t2 && equal' e1 (evalState (subst [(y, Var x)] e2) 0)
     in equal' (normalize ctx e1) (normalize ctx e2)
 
--- Few tests
-
 test1 :: IO ()
 test1 = do
     let ctx = [("x", (Universe 0, Nothing))]
@@ -165,20 +163,16 @@ printInferredType ctx expr = do
     putStrLn $ "type: " ++ show inferredType
 
 -- TODO:
-    -- Infer application
-    -- Test identity with base types
     -- Test basic operations
     -- eval function: extend the context when defining new types
-    -- Write some tests
     -- Write a proper REPL
+
 asu :: Expr
 asu = Let "f" (Var "A") (Var "A") (Var "f")
 
 main :: IO ()
 main = do
-    -- let input = "Define A : Type 0"
-    let input = "let f : A = \\a : A . a; f x"
-    -- let input = "let f : A = A; f"
-    case parse parseExpr "" input of
+    let input = unlines ["Define A : Type 0;", "let f : A = \\a : A . a;", "f x;"]
+    case parse parseProgram "" input of
         Left err   -> putStrLn $ errorBundlePretty err
         Right expr -> print expr

@@ -1,13 +1,14 @@
 module Parser where
 
 import           Control.Monad.Combinators.Expr (makeExprParser)
-import           Data.Functor                   (($>))
+import           Data.Functor                   (void, ($>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Void
 import           Expr                           (Expr (..))
 import           Text.Megaparsec
-import           Text.Megaparsec.Char
+import           Text.Megaparsec.Char           (alphaNumChar, letterChar,
+                                                 newline, space1, string)
 import qualified Text.Megaparsec.Char.Lexer     as L
 import           Text.Megaparsec.Char.Lexer     (space)
 
@@ -38,15 +39,12 @@ identifier = (lexeme . try) (p >>= check)
               then fail $ "keyword " ++ show x ++ " cannot be an identifier"
               else return x
 
-
-
 parseDefinition :: Parser Expr
 parseDefinition = do
     _ <- reservedWord "Define"
     id <- identifier
     _ <- symbol ":"
     ty <- parseUniverse
-    _ <- symbol "."
     return $ Definition id ty
 
 parseLet :: Parser Expr
@@ -80,12 +78,21 @@ parseLambda = do
     body <- parseExpr
     return $ Lambda var varType body
 
-
 parseUniverse :: Parser Expr
 parseUniverse = do
     _ <- reservedWord "Type"
-    n <- L.decimal
-    return $ Universe n
+    Universe <$> L.decimal
+
+parseStatement :: Parser Expr
+parseStatement = parseDefinition <|> parseExpr
+
+-- | Defines how statements are separated (semicolon or newline)
+statementSeparator :: Parser ()
+statementSeparator = void (symbol ";")<|> void newline
+
+-- | Parses an entire program consisting of multiple statements
+parseProgram :: Parser [Expr]
+parseProgram = spaceConsumer *> sepEndBy parseStatement statementSeparator <* eof
 
 
 parseExpr :: Parser Expr
