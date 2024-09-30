@@ -17,6 +17,7 @@ data Expr where
 
 instance Show Expr where
     show (Var x) = x
+    show (Definition s e) = s ++ " : " ++ show e
     show (Let x t e u) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show e ++ "; " ++ show u
     show (Universe k) = "Type" ++ show k
     show (Pi x t e) = "Pi (" ++ x ++ " : " ++ show t ++ ") -> " ++ show e
