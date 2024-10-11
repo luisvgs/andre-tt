@@ -172,7 +172,7 @@ asu = Let "f" (Var "A") (Var "A") (Var "f")
 
 main :: IO ()
 main = do
-    let input = unlines ["Define A : Type 0;", "let f : A = \\a : A . a;", "f x;"]
+    input <- readFile "ex.ty"
     case parse parseProgram "" input of
         Left err   -> putStrLn $ errorBundlePretty err
         Right expr -> print expr

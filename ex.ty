@@ -1,0 +1,5 @@
+Define A : Type 0;
+Define B : A;
+
+let f : A = \a : A . a;
+f x;

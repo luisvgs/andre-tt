@@ -44,7 +44,7 @@ parseDefinition = do
     _ <- reservedWord "Define"
     id <- identifier
     _ <- symbol ":"
-    ty <- parseUniverse
+    ty <- parseUniverse <|> parseVariable
     return $ Definition id ty
 
 parseLet :: Parser Expr
@@ -88,7 +88,7 @@ parseStatement = parseDefinition <|> parseExpr
 
 -- | Defines how statements are separated (semicolon or newline)
 statementSeparator :: Parser ()
-statementSeparator = void (symbol ";")<|> void newline
+statementSeparator = void (symbol ";") <|> void newline
 
 -- | Parses an entire program consisting of multiple statements
 parseProgram :: Parser [Expr]
