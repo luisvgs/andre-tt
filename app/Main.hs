@@ -6,7 +6,6 @@ import           Expr                (Expr (..))
 import           Parser
 import           Text.Megaparsec     (Parsec, errorBundlePretty, parse)
 
-
 type Variable = String
 
 type Context = [(Variable, (Expr, Maybe Expr))]
@@ -140,7 +139,7 @@ test1 = do
 test2 :: IO ()
 test2 = do
     let ctx = []
-    print $ infer ctx (Universe 0) -- Should output Universe 1
+    print $ infer ctx (Universe 0)
 
 test3 :: IO ()
 test3 = do
@@ -148,7 +147,7 @@ test3 = do
         t   = Universe 0
         e   = Var "x"
         lam = Lambda "x" t e
-    print $ infer ctx lam -- Should output Pi "x" (Universe 0) (Universe 0)
+    print $ infer ctx lam
 
 testLet :: Expr
 testLet = Let "f" (Pi "a" (Var "A") (Var "A")) (Lambda "a" (Var "A") (Var "a")) (App (Var "f") (Var "x"))

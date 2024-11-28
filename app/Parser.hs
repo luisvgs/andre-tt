@@ -39,6 +39,14 @@ identifier = (lexeme . try) (p >>= check)
               then fail $ "keyword " ++ show x ++ " cannot be an identifier"
               else return x
 
+parseSubtype :: Parser Expr
+parseSubtype = do
+    _ <- reservedWord "Define"
+    t1 <- identifier
+    _ <- symbol "<:"
+    t2 <- parseVariable
+    return $ Subtype t1 t2
+
 parseDefinition :: Parser Expr
 parseDefinition = do
     _ <- reservedWord "Define"
@@ -84,7 +92,7 @@ parseUniverse = do
     Universe <$> L.decimal
 
 parseStatement :: Parser Expr
-parseStatement = parseDefinition <|> parseExpr
+parseStatement = try parseDefinition <|> try parseSubtype <|> try parseExpr
 
 -- | Defines how statements are separated (semicolon or newline)
 statementSeparator :: Parser ()
@@ -96,4 +104,4 @@ parseProgram = spaceConsumer *> sepEndBy parseStatement statementSeparator <* eo
 
 
 parseExpr :: Parser Expr
-parseExpr = parseLet <|> parseLambda <|> parseSpine <|> parseDefinition
+parseExpr = parseLet <|> parseLambda <|> parseSpine <|> parseDefinition <|> parseSubtype
