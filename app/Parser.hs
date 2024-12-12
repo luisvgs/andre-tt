@@ -42,7 +42,7 @@ identifier = (lexeme . try) (p >>= check)
 parseSubtype :: Parser Expr
 parseSubtype = do
     _ <- reservedWord "Define"
-    t1 <- identifier
+    t1 <- parseExpr
     _ <- symbol "<:"
     t2 <- parseVariable
     return $ Subtype t1 t2

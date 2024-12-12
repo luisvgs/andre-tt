@@ -13,17 +13,17 @@ data Expr where
     Definition  :: String -> Expr -> Expr
     Let :: String -> Expr -> Expr ->  Expr -> Expr
     BaseType :: BaseType -> Expr
-    Subtype :: String -> Expr -> Expr
+    Subtype :: Expr -> Expr -> Expr
     Dummy      :: Expr deriving (Eq)
 
 instance Show Expr where
     show (Var x) = x
-    show (Subtype t1 t2) = t1 ++ " <: " ++ show t2
+    show (Subtype t1 t2) = show t1 ++ " <: " ++ show t2
     show (Definition s e) = s ++ " : " ++ show e
     show (Let x t e u) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show e ++ "; " ++ show u
     show (Universe k) = "Type" ++ show k
     show (Pi x t e) = "Pi (" ++ x ++ " : " ++ show t ++ ") -> " ++ show e
-    show (Lambda x t e) = "Lambda (" ++ x ++ " : " ++ show t ++ ") -> " ++ show e
+    show (Lambda x t e) = "\\(" ++ x ++ " : " ++ show t ++ ") -> " ++ show e
     show (App e1 e2) = "(" ++ show e1 ++ " " ++ show e2 ++ ")"
     show (Gensym s n) = s ++ show n
     show Dummy = "Dummy"
