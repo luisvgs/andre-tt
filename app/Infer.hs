@@ -94,19 +94,17 @@ infer (App e1 e2)                                = do
             put replState { fresh                = fresh' }
             return result
         else error $ "Couldn't match expected types: " ++ show t1 ++ " and " ++ show t1'
--- infer (Let x t e1 e2)                         =
---     let t1                                    = infer ctx subctx e1
---     in trace ("Let: declared type             = " ++ show t ++
---               ", inferred type of e1          = " ++ show t1 ++
---               ", context                      = " ++ show ctx) $
---        if equal ctx t t1
---        then let newCtx                        = extend x t (Just e1) ctx
---             in trace ("Extended context       = " ++ show newCtx ++ " AAAA equal" ++ show t ++ " " ++ show t1) $
---                infer newCtx subctx e2
---        else
---        trace ("Failed because "++ show t ++ " not equal " ++ show t1) $
---            error "Type mismatch in let expression"
-infer x                                          =
+infer (Let x t e1 e2)                   = do
+    replState <- get
+    let Repl { context                  = ctx, subtype = subctx } = replState
+    let (t1, _)                         = runState (infer e1) replState
+    if equal ctx t t1
+       then do
+        let newCtx                  = extend x t (Just e1) ctx
+        put replState { context = newCtx }
+        infer e2
+       else error "Type mismatch in let expression"
+infer x                                 =
        trace ("Unhandled " ++ show x) $
            error "Unsupported expression "
 

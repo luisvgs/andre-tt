@@ -6,6 +6,7 @@ import           Data.Functor                   (void, ($>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Void
+import           Debug.Trace
 import           Expr                           (Expr (..))
 import           Text.Megaparsec
 import           Text.Megaparsec.Char           (alphaNumChar, letterChar,
@@ -26,7 +27,7 @@ lexeme :: Parser a -> Parser a
 lexeme = L.lexeme spaceConsumer
 
 reservedWords :: [String]
-reservedWords = ["Define", "let", "function", "Type"]
+reservedWords = ["Define", "Let", "function", "Type"]
 
 reservedWord :: String -> Parser ()
 reservedWord w = (lexeme . try) (string w *> notFollowedBy alphaNumChar)
@@ -56,29 +57,29 @@ parseDefinition = do
     return $ Definition id ty
 
 parseLet :: Parser Expr
-parseLet = do
-    l <- reservedWord "let"
-    x <- pBind
-    symbol ":"
+parseLet = trace "parsing let exprs " $ do
+    dbg "Consuming let keyword" $ reservedWord "Let"
+    x <- dbg "consuming bing " $ pBind
+    _ <- symbol ":"
     a <- parseExpr
-    symbol "="
-    t <- parseExpr
+    _ <- symbol "="
+    t <- try parseLambda <|> parseExpr
     symbol ";"
     u <- parseExpr
     pure $ Let x a t u
 
 
 pBind :: Parser String
-pBind = identifier <|> symbol "_"
+pBind = trace "Parsing identifier or symbol" $ identifier <|> symbol "_"
 
 parseVariable :: Parser Expr
 parseVariable = Var <$> identifier
 
 parseSpine :: Parser Expr
-parseSpine = foldl1 App <$> some parseVariable
+parseSpine = trace "Parsing spine" $ foldl1 App <$> some parseVariable
 
 parseLambda :: Parser Expr
-parseLambda = do
+parseLambda = trace "Parsing lambda " $ do
     symbol "\\"
     var <- identifier
     _ <- symbol ":"
@@ -93,18 +94,16 @@ parseUniverse = do
     Universe <$> L.decimal
 
 parseStatement :: Parser Expr
-parseStatement = try parseDefinition <|> try parseSubtype <|> try parseExpr
+parseStatement = trace "Trying to parse statement" $ try parseExpr <|> try parseDefinition <|> try parseSubtype
 
--- | Defines how statements are separated (semicolon or newline)
 statementSeparator :: Parser ()
 statementSeparator = void (symbol ";") <|> void newline
 
--- | Parses an entire program consisting of multiple statements
 parseProgram :: Parser [Expr]
 parseProgram = spaceConsumer *> sepEndBy parseStatement statementSeparator <* eof
 
 parseExpr :: Parser Expr
-parseExpr = parseLet <|> parseLambda <|> parseSpine <|> parseDefinition <|> parseSubtype <|> integer <|> boolean
+parseExpr = trace "Parsing expr" $ parseLet <|> parseLambda <|> parseSpine <|> parseDefinition <|> parseSubtype <|> integer <|> boolean
 
 integer :: Parser Expr
 integer = do

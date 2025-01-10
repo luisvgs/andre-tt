@@ -3,6 +3,7 @@ import           Control.Monad         (unless)
 import           Control.Monad.State
 import           Data.Functor.Identity
 import           Data.Maybe            (fromMaybe)
+import           Data.Void
 import           Debug.Trace           (trace)
 import           Expr                  (Expr (..))
 import           Infer
@@ -10,7 +11,8 @@ import           Parser
 import           Shared                (Context, Repl (..), ReplState,
                                         SubtypeContext, Variable)
 import           System.IO
-import           Text.Megaparsec       (Parsec, errorBundlePretty, parse)
+import           Text.Megaparsec       (ParseErrorBundle (ParseErrorBundle),
+                                        Parsec, errorBundlePretty, parse)
 
 -- emptyCtx :: Context
 -- emptyCtx = [("A", (Universe 0, Nothing)), ("x", (Var "A", Nothing)), ("B", (Universe 1, Nothing)),
@@ -44,20 +46,23 @@ repl                                         = do
         case getCommand input of
             TypeCheckFile -> do
                 result <- liftIO $ readFile "ex.ty"
-                liftIO $ putStrLn result
+                let lines' = lines result
+                parseExpression (parse parseProgram "" input) -- TODO read lines
             Ctx -> do
                 Repl { context               = ctx, subtype = subctx, fresh = fresh} <- get
                 liftIO $ print (formatContext ctx)
-            Continue -> case parse parseProgram "" input of
-                Left err   -> liftIO $ putStrLn $ errorBundlePretty err
-                Right expr -> do
-                    let inferredExprs        = traverse infer expr
-                    replState <- get
-                    let (result, finalState) = runState inferredExprs replState
-                    put finalState
-                    let results              = runIdentity $ evalStateT inferredExprs finalState
-                    liftIO $ print result
+            Continue -> parseExpression (parse parseProgram "" "Let f : A = \a : A . a; f x;")
         repl
+    where
+        parseExpression :: Either (ParseErrorBundle String Void) [Expr] -> ReplState ()
+        parseExpression (Left err) = liftIO $ putStrLn $ errorBundlePretty err
+        parseExpression (Right expr) = do
+                let inferredExprs        = traverse infer expr
+                replState <- get
+                let (result, finalState) = runState inferredExprs replState
+                put finalState
+                let results              = runIdentity $ evalStateT inferredExprs finalState
+                liftIO $ print result
 
 read' :: IO String
 read'                                        = putStr ">> " >> hFlush stdout >> getLine
