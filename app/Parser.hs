@@ -1,5 +1,6 @@
 module Parser where
 
+import           BaseType
 import           Control.Monad.Combinators.Expr (makeExprParser)
 import           Data.Functor                   (void, ($>))
 import           Data.Set                       (Set)
@@ -11,8 +12,7 @@ import           Text.Megaparsec.Char           (alphaNumChar, letterChar,
                                                  newline, space1, string)
 import qualified Text.Megaparsec.Char.Lexer     as L
 import           Text.Megaparsec.Char.Lexer     (space)
-
-
+import           Text.Megaparsec.Debug
 
 type Parser = Parsec Void String
 
@@ -67,6 +67,7 @@ parseLet = do
     u <- parseExpr
     pure $ Let x a t u
 
+
 pBind :: Parser String
 pBind = identifier <|> symbol "_"
 
@@ -102,6 +103,15 @@ statementSeparator = void (symbol ";") <|> void newline
 parseProgram :: Parser [Expr]
 parseProgram = spaceConsumer *> sepEndBy parseStatement statementSeparator <* eof
 
-
 parseExpr :: Parser Expr
-parseExpr = parseLet <|> parseLambda <|> parseSpine <|> parseDefinition <|> parseSubtype
+parseExpr = parseLet <|> parseLambda <|> parseSpine <|> parseDefinition <|> parseSubtype <|> integer <|> boolean
+
+integer :: Parser Expr
+integer = do
+    n <- lexeme L.decimal
+    return (BaseType (Integer n))
+
+boolean :: Parser Expr
+boolean = do
+    value <- choice [reservedWord "True" *> pure True, reservedWord "False" *> pure False]
+    return (BaseType (Boolean value))

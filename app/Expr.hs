@@ -10,9 +10,9 @@ data Expr where
     Lambda     :: String -> Expr -> Expr -> Expr
     App        :: Expr -> Expr -> Expr
     Gensym     :: String -> Int -> Expr
-    Definition  :: String -> Expr -> Expr
     Let :: String -> Expr -> Expr ->  Expr -> Expr
     BaseType :: BaseType -> Expr
+    Definition  :: String -> Expr -> Expr
     Subtype :: Expr -> Expr -> Expr
     Dummy      :: Expr deriving (Eq)
 
@@ -26,4 +26,5 @@ instance Show Expr where
     show (Lambda x t e) = "\\(" ++ x ++ " : " ++ show t ++ ") -> " ++ show e
     show (App e1 e2) = "(" ++ show e1 ++ " " ++ show e2 ++ ")"
     show (Gensym s n) = s ++ show n
+    show (BaseType t) = show t
     show Dummy = "Dummy"
