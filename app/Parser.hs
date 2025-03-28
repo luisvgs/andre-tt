@@ -6,7 +6,6 @@ import           Data.Functor                   (void, ($>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Void
-import           Debug.Trace
 import           Expr                           (Expr (..))
 import           Text.Megaparsec
 import           Text.Megaparsec.Char           (alphaNumChar, letterChar,
@@ -14,6 +13,7 @@ import           Text.Megaparsec.Char           (alphaNumChar, letterChar,
 import qualified Text.Megaparsec.Char.Lexer     as L
 import           Text.Megaparsec.Char.Lexer     (space)
 import           Text.Megaparsec.Debug
+-- import           Debug.Trace
 
 type Parser = Parsec Void String
 
@@ -27,10 +27,14 @@ lexeme :: Parser a -> Parser a
 lexeme = L.lexeme spaceConsumer
 
 reservedWords :: [String]
-reservedWords = ["Define", "Let", "function", "Type"]
+reservedWords = ["define", "let", "function", "Type"]
 
 reservedWord :: String -> Parser ()
-reservedWord w = (lexeme . try) (string w *> notFollowedBy alphaNumChar)
+reservedWord w = do
+    (lexeme . try) $ do
+        _ <- string w
+        notFollowedBy alphaNumChar
+        return ()
 
 identifier :: Parser String
 identifier = (lexeme . try) (p >>= check)
@@ -42,7 +46,7 @@ identifier = (lexeme . try) (p >>= check)
 
 parseSubtype :: Parser Expr
 parseSubtype = do
-    _ <- reservedWord "Define"
+    _ <- reservedWord "define"
     t1 <- parseExpr
     _ <- symbol "<:"
     t2 <- parseVariable
@@ -50,40 +54,50 @@ parseSubtype = do
 
 parseDefinition :: Parser Expr
 parseDefinition = do
-    _ <- reservedWord "Define"
+    _ <- reservedWord "define"
     id <- identifier
     _ <- symbol ":"
     ty <- parseUniverse <|> parseVariable
     return $ Definition id ty
 
 parseLet :: Parser Expr
-parseLet = trace "parsing let exprs " $ do
-    dbg "Consuming let keyword" $ reservedWord "Let"
-    x <- dbg "consuming bing " $ pBind
+parseLet = do
+    reservedWord "let"
+    x <- identifier
     _ <- symbol ":"
-    a <- parseExpr
+    a <- try parseArrowType <|> parseAtom
     _ <- symbol "="
-    t <- try parseLambda <|> parseExpr
+    t <- parseExpr
     symbol ";"
     u <- parseExpr
     pure $ Let x a t u
 
+parseLetDefinition :: Parser Expr
+parseLetDefinition = do
+    reservedWord "let"
+    x <- identifier
+    _ <- symbol ":"
+    a <- try parseArrowType <|> parseAtom
+    _ <- symbol "="
+    t <- parseExpr
+    _ <- symbol ";"
+    pure $ Let x a t (Var x)
 
 pBind :: Parser String
-pBind = trace "Parsing identifier or symbol" $ identifier <|> symbol "_"
+pBind = identifier <|> symbol "_"
 
 parseVariable :: Parser Expr
 parseVariable = Var <$> identifier
 
 parseSpine :: Parser Expr
-parseSpine = trace "Parsing spine" $ foldl1 App <$> some parseVariable
+parseSpine = foldl1 App <$> some parseAtom
 
 parseLambda :: Parser Expr
-parseLambda = trace "Parsing lambda " $ do
+parseLambda = do
     symbol "\\"
     var <- identifier
     _ <- symbol ":"
-    varType <- parseExpr
+    varType <- parseAtom
     _ <- symbol "."
     body <- parseExpr
     return $ Lambda var varType body
@@ -93,8 +107,16 @@ parseUniverse = do
     _ <- reservedWord "Type"
     Universe <$> L.decimal
 
+parseArrowType :: Parser Expr
+parseArrowType = do
+    t1 <- parseAtom
+    _ <- symbol "->"
+    t2 <- parseAtom
+    let freshVar = "_x"
+    return $ Pi freshVar t1 t2
+
 parseStatement :: Parser Expr
-parseStatement = trace "Trying to parse statement" $ try parseExpr <|> try parseDefinition <|> try parseSubtype
+parseStatement = try parseExpr <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition
 
 statementSeparator :: Parser ()
 statementSeparator = void (symbol ";") <|> void newline
@@ -103,7 +125,16 @@ parseProgram :: Parser [Expr]
 parseProgram = spaceConsumer *> sepEndBy parseStatement statementSeparator <* eof
 
 parseExpr :: Parser Expr
-parseExpr = trace "Parsing expr" $ parseLet <|> parseLambda <|> parseSpine <|> parseDefinition <|> parseSubtype <|> integer <|> boolean
+parseExpr = try parseLet <|> try parseLambda <|> try parseSpine <|> try parseAtom
+
+parseAtom :: Parser Expr
+parseAtom = choice
+    [ parseVariable
+    , parseUniverse
+    , integer
+    , boolean
+    , between (symbol "(") (symbol ")") parseExpr
+    ]
 
 integer :: Parser Expr
 integer = do

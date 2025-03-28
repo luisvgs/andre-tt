@@ -1,8 +1,7 @@
-Define A : Type 0;
+define A : Type 0;
+define Int : Type 0;
 
-Define B : A;
+let foo : Int = 10;
 
-Define C <: A;
-
-let f : A = \a : A . a;
-f x;
+let f : Int -> Int = \a : Int . a;
+f foo;

@@ -63,7 +63,7 @@ infer (Definition id ty)                         = do
     let newCtx                                   = extend id ty Nothing ctx
     put replState { context                      = newCtx }
     return $ Definition id ty
-infer (BaseType (Integer n))                     =  return $ BaseType (Integer n)
+infer (BaseType (Integer n))                     = return $ Var "Int"
 infer (BaseType (Boolean b))                     =  return $ BaseType (Boolean b)
 infer (Universe k)                               = return $ Universe ( k + 1 )
 
@@ -80,9 +80,10 @@ infer (Lambda x t e)                             = do
         _                                        = inferUniverse ctx subctx t
         newCtx                                   = (extend x t Nothing ctx)
     put replState { context                      = newCtx }
-    let (te, _)                                  = runState (infer e) replState
+    te <- infer e
     return $ Pi x t te
 infer (App e1 e2)                                = do
+    trace ("Application case: " ++ show e1 ++ " applied to " ++ show e2) $ return ()
     replState <- get
     Repl { context                               = ctx, subtype = subctx, fresh = fresh} <- get
     let (stateResult, _)                         = runState (inferPi ctx subctx e1) replState
@@ -92,22 +93,27 @@ infer (App e1 e2)                                = do
         then do
             let (result, fresh')                 = runState (subst [(x, e2)] t2) fresh
             put replState { fresh                = fresh' }
+            trace ("res " ++ show result) $ return ()
             return result
         else error $ "Couldn't match expected types: " ++ show t1 ++ " and " ++ show t1'
-infer (Let x t e1 e2)                   = do
+infer (Let x t e1 e2) = do
     replState <- get
-    let Repl { context                  = ctx, subtype = subctx } = replState
-    let (t1, _)                         = runState (infer e1) replState
-    if equal ctx t t1
-       then do
-        let newCtx                  = extend x t (Just e1) ctx
-        put replState { context = newCtx }
-        infer e2
-       else error "Type mismatch in let expression"
-infer x                                 =
-       trace ("Unhandled " ++ show x) $
-           error "Unsupported expression "
+    let ctx = context replState
+    let subctx = subtype replState
 
+    trace ("Let expression: " ++ show x ++ " : " ++ show t ++ " = " ++ show e1) $ return ()
+
+    t1 <- infer e1
+    trace ("Declared type: " ++ show t) $ return ()
+    trace ("Inferred type of expression: " ++ show t1) $ return ()
+
+    if isSubtype ctx subctx t1 t
+       then do
+         trace ("Types match, extending context") $ return ()
+         let newCtx = extend x t (Just e1) ctx
+         put replState { context = newCtx }
+         infer e2
+       else error $ "Type mismatch in let expression: " ++ show t ++ " and " ++ show t1 ++ " are not equal."
 inferUniverse :: Context -> SubtypeContext -> Expr -> State Repl Int
 inferUniverse ctx subctx t                       = do
     replState <- get
@@ -124,9 +130,10 @@ inferPi ctx subctx e                             = do
 
 normalize :: Context -> Expr -> Expr
 normalize ctx (Var x)                            =
-    case lookupTy x ctx of
-        Just t  -> normalize ctx t
-        Nothing -> Var x
+    trace ("(DEBUG) looking for " ++ show x) $
+    case lookupVal x ctx of
+        Just (Just t) -> normalize ctx t -- NOTE: if there is a value, keep normalizing
+        _             -> Var x -- NOTE: otherwise return the variable as it is
 normalize ctx (Pi x t e)                         =
     let (x', t', e')                             = normalizeAbstraction ctx (x, t, e)
     in Pi x' t' e'
@@ -134,11 +141,38 @@ normalize ctx (Lambda x t e)                     =
     let (x', t', e')                             = normalizeAbstraction ctx (x, t, e)
     in Lambda x' t' e'
 normalize ctx (Universe k)                       = Universe k
-normalize ctx (App e1 e2)                        =
-        let e2'                                  = normalize ctx e2
-        in case normalize ctx e1 of
-             Lambda x _ e1' -> normalize ctx (evalState (subst [(x, e2')] e1') 0)
-             e1'            -> App e1' e2'
+normalize ctx (App e1 e2) =
+    trace ("(DEBUG) App case: applying " ++ show e1 ++ " to " ++ show e2) $
+    let e1' = normalize ctx e1
+        e2' = normalize ctx e2
+    in case e1' of
+        Lambda x _ body ->
+            trace ("(DEBUG) LAMBDA substituing " ++ show x ++ " for " ++ show e2' ++ " in " ++ show body) $
+            normalize ctx (evalState (subst [(x, e2')] body) 0)
+        _ ->
+            case e1' of
+                Var f -> case lookupVal f ctx of
+                    Just (Just (Lambda x _ body)) ->
+                        trace ("(DEBUG) case e1 Var " ++ show x ++ " with body " ++ show body) $
+                        trace ("(DEBUG) substituing " ++ show x ++ " for " ++ show e2' ++ "in " ++ show body) $
+                        normalize ctx (evalState (subst [(x, e2')] body) 0)
+                    _ -> App e1' e2'
+                _ -> App e1' e2'
+normalize ctx (BaseType a) = BaseType a
+normalize ctx (Let x t e1 e2)                  =
+    let e1' = normalize ctx e1
+        ctx' = extend x t (Just e1') ctx
+        e2' = normalize ctx' e2
+    in e2'
+normalize ctx x                                 =
+       trace ("Unhandled " ++ show x) $
+           error "Unsupported expression "
+--NOTE: keep just in case
+-- normalize ctx (App e1 e2)                        =
+--         let e2'                                  = normalize ctx e2
+--         in case normalize ctx e1 of
+--              Lambda x _ e1' -> normalize ctx (evalState (subst [(x, e2')] e1') 0)
+--              e1'            -> App e1' e2'
 
 normalizeAbstraction :: Context -> (String, Expr, Expr) -> (String, Expr, Expr)
 normalizeAbstraction ctx (x, t, e)               =

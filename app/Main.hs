@@ -13,7 +13,6 @@ import           Shared                (Context, Repl (..), ReplState,
 import           System.IO
 import           Text.Megaparsec       (ParseErrorBundle (ParseErrorBundle),
                                         Parsec, errorBundlePretty, parse)
-
 -- emptyCtx :: Context
 -- emptyCtx = [("A", (Universe 0, Nothing)), ("x", (Var "A", Nothing)), ("B", (Universe 1, Nothing)),
 --             ("y", (Var "C", Nothing)),
@@ -24,11 +23,11 @@ import           Text.Megaparsec       (ParseErrorBundle (ParseErrorBundle),
 -- emptySubCtx:: SubtypeContext
 -- emptySubCtx = [(Var "C", [Var "A"])]
 
-data Command = TypeCheckFile | Ctx | Continue
+data Command = TypeCheckFile | Ctx | Continue | Evaluate
 
 getCommand :: String -> Command
 getCommand ":f" = TypeCheckFile
-getCommand ":e" = Ctx
+getCommand ":c" = Ctx
 getCommand _    = Continue
 
 ------------------
@@ -37,7 +36,10 @@ getCommand _    = Continue
 ------------------
 
 main :: IO ()
-main                                         = evalStateT repl (Repl [] [] 0)
+main = evalStateT repl (Repl
+    [ ("A", (Universe 0, Nothing))    -- A is a type
+    , ("x", (Var "A", Nothing))       -- x has type A
+    ] [] 0)
 
 repl :: ReplState ()
 repl                                         = do
@@ -47,22 +49,42 @@ repl                                         = do
             TypeCheckFile -> do
                 result <- liftIO $ readFile "ex.ty"
                 let lines' = lines result
-                parseExpression (parse parseProgram "" input) -- TODO read lines
+                evalExpr (parse parseProgram "" result) -- FIXME read lines passed in prompt.
             Ctx -> do
                 Repl { context               = ctx, subtype = subctx, fresh = fresh} <- get
                 liftIO $ print (formatContext ctx)
-            Continue -> parseExpression (parse parseProgram "" "Let f : A = \a : A . a; f x;")
+            Continue -> evalExpr (parse parseProgram "" input) -- FIXME placeholder operation
         repl
     where
-        parseExpression :: Either (ParseErrorBundle String Void) [Expr] -> ReplState ()
-        parseExpression (Left err) = liftIO $ putStrLn $ errorBundlePretty err
-        parseExpression (Right expr) = do
-                let inferredExprs        = traverse infer expr
-                replState <- get
-                let (result, finalState) = runState inferredExprs replState
-                put finalState
-                let results              = runIdentity $ evalStateT inferredExprs finalState
-                liftIO $ print result
+        evalExpr :: Either (ParseErrorBundle String Void) [Expr] -> ReplState ()
+        evalExpr (Left err) = liftIO $ putStrLn $ errorBundlePretty err
+        evalExpr (Right exprs) = do
+            liftIO $ putStrLn $ "(DEBUG) original expressions to eat: " ++ show exprs
+            replState <- get
+            liftIO $ putStrLn $ "(DEBUG) replState context: " ++ show (formatContext $ context replState)
+
+            forM_ (init exprs) $ \expr -> do
+                currentState <- get
+                liftIO $ putStrLn $ "(DEBUG) current processing expr: " ++ show expr
+                let (inferredType, newState) = runState (infer expr) currentState
+                put newState
+                liftIO $ putStrLn $ "(DEBUG) Current inferred type: " ++ show inferredType
+
+            unless (null exprs) $ do --NOTE: evaluate the last expression as the value of the whole program
+                currentState <- get
+                let lastExpr = last exprs
+                liftIO $ putStrLn $ "(DEBUG) Processing last expr: " ++ show lastExpr
+                let (inferredType, newState) = runState (infer lastExpr) currentState
+                put newState
+
+                Repl { context = ctx } <- get
+                liftIO $ putStrLn $ "(DEBUG) Final context: " ++ show (formatContext ctx)
+
+                liftIO $ putStrLn $ "(DEBUG) expr before normalization: " ++ show lastExpr
+                let normalizedExpr = normalize ctx lastExpr
+                liftIO $ putStrLn $ "(DEBUG) expr after normalization: " ++ show normalizedExpr
+                liftIO $ print $ show normalizedExpr
+                liftIO $ putStrLn $ "Type: " ++ show inferredType
 
 read' :: IO String
 read'                                        = putStr ">> " >> hFlush stdout >> getLine
@@ -73,39 +95,3 @@ formatContext                                = map fmt
         fmt :: (Variable, (Expr, Maybe Expr)) -> String
         fmt (var, (typ, Nothing))            = show var ++ " : " ++ show typ
         fmt (var, (typ, Just val))           = show var ++ " : " ++ show typ ++ " = " ++ show val
-
--- test1 :: IO ()
--- test1                                     = do
---     let ctx                               = [("x", (Universe 0, Nothing))]
---     print $ infer ctx [] (Var "x")
-
--- test2 :: IO ()
--- test2                                     = do
---     let ctx                               = []
---     print $ infer ctx [] (Universe 0)
-
--- test3 :: IO ()
--- test3                                     = do
---     let ctx                               = []
---         t                                 = Universe 0
---         e                                 = Var "x"
---         lam                               = Lambda "x" t e
---     print $ infer ctx [] lam
-
--- testLet :: Expr
--- testLet                                   = Let "f" (Pi "a" (Var "A") (Var "A")) (Lambda "a" (Var "A") (Var "a")) (App (Var "f") (Var "x"))
-
--- testIdentity :: IO ()
--- testIdentity                              = do
---     printInferredType emptyCtx testLet
-
--- printInferredType :: Context -> Expr -> IO ()
--- printInferredType ctx expr                = do
---     let inferredType                      = infer ctx [] expr
---     putStrLn $ "type: " ++ show inferredType
-
--- testLetWithSubtype :: IO ()
--- testLetWithSubtype                        = do
---     let expr                              = Let "f" (Pi "a" (Var "A") (Var "A")) (Lambda "a" (Var "A") (Var "a")) (App (Var "f") (Var "z"))
---     let result                            = infer emptyCtx emptySubCtx expr
---     putStrLn $ "Inferred type of testLetWithSubtype: " ++ show result

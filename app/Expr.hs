@@ -26,5 +26,7 @@ instance Show Expr where
     show (Lambda x t e) = "\\(" ++ x ++ " : " ++ show t ++ ") -> " ++ show e
     show (App e1 e2) = "(" ++ show e1 ++ " " ++ show e2 ++ ")"
     show (Gensym s n) = s ++ show n
-    show (BaseType t) = show t
+    show (BaseType t) = case t of
+        (Integer a) -> show a
+        (Boolean b) -> show b
     show Dummy = "Dummy"
