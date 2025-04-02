@@ -14,6 +14,7 @@ data Expr where
     BaseType :: BaseType -> Expr
     Definition  :: String -> Expr -> Expr
     Subtype :: Expr -> Expr -> Expr
+    BinOp :: Expr -> Expr -> Expr
     Dummy      :: Expr deriving (Eq)
 
 instance Show Expr where
@@ -29,4 +30,5 @@ instance Show Expr where
     show (BaseType t) = case t of
         (Integer a) -> show a
         (Boolean b) -> show b
+    show (BinOp a b) = show a ++ " " ++ show b
     show Dummy = "Dummy"

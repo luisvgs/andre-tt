@@ -66,7 +66,13 @@ infer (Definition id ty)                         = do
 infer (BaseType (Integer n))                     = return $ Var "Int"
 infer (BaseType (Boolean b))                     =  return $ BaseType (Boolean b)
 infer (Universe k)                               = return $ Universe ( k + 1 )
-
+infer (BinOp (BaseType (Integer a)) (BaseType (Integer b)))= infer (BaseType (Integer (a + b)))
+infer (BinOp e1 e2)= do
+    t1 <- infer e1
+    t2 <- infer e2
+    case (t1, t2) of
+        (Var "Int", Var "Int") -> return $ Var "Int"
+        _ -> error $ "Type mismatch in binary operation: " ++ show t1  ++ " and " ++ show t2
 infer (Pi x t1 t2)                               = do
     Repl { context                               = ctx, subtype = subctx } <- get
     replState <- get
@@ -78,7 +84,7 @@ infer (Lambda x t e)                             = do
     let ctx                                      = context replState
         subctx                                   = subtype replState
         _                                        = inferUniverse ctx subctx t
-        newCtx                                   = (extend x t Nothing ctx)
+        newCtx                                   = extend x t Nothing ctx
     put replState { context                      = newCtx }
     te <- infer e
     return $ Pi x t te
@@ -114,6 +120,9 @@ infer (Let x t e1 e2) = do
          put replState { context = newCtx }
          infer e2
        else error $ "Type mismatch in let expression: " ++ show t ++ " and " ++ show t1 ++ " are not equal."
+infer x                                 =
+       trace ("(INFERENCE) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
+
 inferUniverse :: Context -> SubtypeContext -> Expr -> State Repl Int
 inferUniverse ctx subctx t                       = do
     replState <- get
@@ -159,14 +168,20 @@ normalize ctx (App e1 e2) =
                     _ -> App e1' e2'
                 _ -> App e1' e2'
 normalize ctx (BaseType a) = BaseType a
+normalize ctx (BinOp (BaseType (Integer a)) (BaseType (Integer b)))= BaseType (Integer (a + b))
+normalize ctx (BinOp a b) = do
+    let a' = normalize ctx a
+        b' = normalize ctx b
+    case (a', b') of
+        (BaseType (Integer aVal), BaseType (Integer bVal)) -> BaseType (Integer (aVal + bVal))
+        _ -> BinOp a' b'
 normalize ctx (Let x t e1 e2)                  =
     let e1' = normalize ctx e1
         ctx' = extend x t (Just e1') ctx
         e2' = normalize ctx' e2
     in e2'
 normalize ctx x                                 =
-       trace ("Unhandled " ++ show x) $
-           error "Unsupported expression "
+       trace ("(NORMALIZATION) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
 --NOTE: keep just in case
 -- normalize ctx (App e1 e2)                        =
 --         let e2'                                  = normalize ctx e2

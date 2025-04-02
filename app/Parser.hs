@@ -6,6 +6,7 @@ import           Data.Functor                   (void, ($>))
 import           Data.Set                       (Set)
 import qualified Data.Set                       as Set
 import           Data.Void
+import           Debug.Trace
 import           Expr                           (Expr (..))
 import           Text.Megaparsec
 import           Text.Megaparsec.Char           (alphaNumChar, letterChar,
@@ -13,7 +14,6 @@ import           Text.Megaparsec.Char           (alphaNumChar, letterChar,
 import qualified Text.Megaparsec.Char.Lexer     as L
 import           Text.Megaparsec.Char.Lexer     (space)
 import           Text.Megaparsec.Debug
--- import           Debug.Trace
 
 type Parser = Parsec Void String
 
@@ -125,7 +125,26 @@ parseProgram :: Parser [Expr]
 parseProgram = spaceConsumer *> sepEndBy parseStatement statementSeparator <* eof
 
 parseExpr :: Parser Expr
-parseExpr = try parseLet <|> try parseLambda <|> try parseSpine <|> try parseAtom
+parseExpr = parseTerm
+
+parseTerm :: Parser Expr
+parseTerm = do
+    first <- try parseLet <|> try parseLambda <|> parseSimpleTerm
+
+    option first $ do
+        _ <- symbol "+"
+        second <- parseTerm
+        return $ BinOp first second
+
+parseSimpleTerm :: Parser Expr
+parseSimpleTerm = try parseSpine <|> parseAtom
+
+parseBinOp :: Parser Expr
+parseBinOp = do
+    a <- parseAtom <|> parseSpine
+    _ <- symbol "+"
+    b <- parseExpr
+    return $ BinOp a b
 
 parseAtom :: Parser Expr
 parseAtom = choice
