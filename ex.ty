@@ -13,3 +13,7 @@ data nat : A where
 | zero : nat
 | suc : nat -> nat
 .
+
+let z : nat = zero;
+let one : nat = suc zero;
+let two : nat = suc (suc zero);

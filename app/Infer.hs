@@ -118,7 +118,8 @@ infer (Inductive name ty constructors) = do
 
         -- Check return type of constructor ends in the type being defined
         case getReturnType ctype of
-            Just (Var retName) | retName == name -> pure ()
+            Just (Var retName) | retName == name -> do
+                                     modify (\st -> st { context = extend cname ctype Nothing (context st) })
             _ -> error $ "Constructor " ++ cname ++ " must return " ++ name
 
     return $ Inductive name ty constructors
