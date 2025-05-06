@@ -15,11 +15,16 @@ data Expr where
     Definition  :: String -> Expr -> Expr
     Subtype :: Expr -> Expr -> Expr
     BinOp :: Expr -> Expr -> Expr
+    Inductive :: String -> Expr -> [(String, Expr)] -> Expr -- data N : U where | n : N -> N | z : N
     Dummy      :: Expr deriving (Eq)
 
 instance Show Expr where
     show (Var x) = x
     show (Subtype t1 t2) = show t1 ++ " <: " ++ show t2
+    show (Inductive name ty constructors) = "inductive " ++ name ++ " : " ++ show ty ++ " \n where\n" ++
+        concatMap showConstructor constructors
+        where showConstructor (cname, ctype) =
+                  " | " ++ cname ++ " -> " ++ show ctype ++ "\n"
     show (Definition s e) = s ++ " : " ++ show e
     show (Let x t e u) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show e ++ "; " ++ show u
     show (Universe k) = "Type" ++ show k

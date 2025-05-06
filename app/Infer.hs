@@ -1,3 +1,4 @@
+{-# LANGUAGE LambdaCase #-}
 module Infer where
 import           BaseType
 import           Control.Applicative (Alternative (..))
@@ -102,6 +103,25 @@ infer (App e1 e2)                                = do
             trace ("res " ++ show result) $ return ()
             return result
         else error $ "Couldn't match expected types: " ++ show t1 ++ " and " ++ show t1'
+infer (Inductive name ty constructors) = do
+    replState <- get
+    tyType <- infer ty -- check that ty is well-typed in universe Ui
+    ensureUniverse tyType
+
+    let ctx = context replState
+    let newCtx = extend name ty Nothing ctx -- Extend the context with nat : ty
+    put replState { context = newCtx }
+
+    forM_ constructors $ \(cname, ctype) -> do -- for each constructor ci, check if ti : nat
+        ctypeTy <- infer ctype
+        -- ensureUniverse ctypeTy -- Each constructor must be well-typed
+
+        -- Check return type of constructor ends in the type being defined
+        case getReturnType ctype of
+            Just (Var retName) | retName == name -> pure ()
+            _ -> error $ "Constructor " ++ cname ++ " must return " ++ name
+
+    return $ Inductive name ty constructors
 infer (Let x t e1 e2) = do
     replState <- get
     let ctx = context replState
@@ -123,6 +143,11 @@ infer (Let x t e1 e2) = do
 infer x                                 =
        trace ("(INFERENCE) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
 
+
+ensureUniverse :: Expr -> State Repl()
+ensureUniverse (Universe _) = pure ()
+ensureUniverse x = error $ "Expected a universe type, got: " ++ show x
+
 inferUniverse :: Context -> SubtypeContext -> Expr -> State Repl Int
 inferUniverse ctx subctx t                       = do
     replState <- get
@@ -136,6 +161,10 @@ inferPi ctx subctx e                             = do
     case normalize ctx (fst (runState (infer e) replState)) of
         (Pi x t e) -> return $ (x, t, e)
         _          -> error "Function expected"
+
+getReturnType :: Expr -> Maybe Expr
+getReturnType (Pi _ _ body) = getReturnType body
+getReturnType t             = Just t
 
 normalize :: Context -> Expr -> Expr
 normalize ctx (Var x)                            =
@@ -180,6 +209,10 @@ normalize ctx (Let x t e1 e2)                  =
         ctx' = extend x t (Just e1') ctx
         e2' = normalize ctx' e2
     in e2'
+normalize ctx (Inductive name ty constructors) =
+    let ty' = normalize ctx ty
+        constructors' = [ (cname, normalize ctx ctype) | (cname, ctype) <- constructors ]
+    in Inductive name ty' constructors'
 normalize ctx x                                 =
        trace ("(NORMALIZATION) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
 --NOTE: keep just in case

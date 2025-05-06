@@ -9,7 +9,7 @@ import           Data.Void
 import           Debug.Trace
 import           Expr                           (Expr (..))
 import           Text.Megaparsec
-import           Text.Megaparsec.Char           (alphaNumChar, letterChar,
+import           Text.Megaparsec.Char           (alphaNumChar, eol, letterChar,
                                                  newline, space1, string)
 import qualified Text.Megaparsec.Char.Lexer     as L
 import           Text.Megaparsec.Char.Lexer     (space)
@@ -27,7 +27,13 @@ lexeme :: Parser a -> Parser a
 lexeme = L.lexeme spaceConsumer
 
 reservedWords :: [String]
-reservedWords = ["define", "let", "function", "Type"]
+reservedWords = ["define",
+                 "let",
+                 "function",
+                 "Type",
+                 "where",
+                 "match",
+                 "data"]
 
 reservedWord :: String -> Parser ()
 reservedWord w = do
@@ -68,7 +74,6 @@ parseLet = do
     a <- try parseArrowType <|> parseAtom
     _ <- symbol "="
     t <- parseExpr
-    symbol ";"
     u <- parseExpr
     pure $ Let x a t u
 
@@ -80,7 +85,6 @@ parseLetDefinition = do
     a <- try parseArrowType <|> parseAtom
     _ <- symbol "="
     t <- parseExpr
-    _ <- symbol ";"
     pure $ Let x a t (Var x)
 
 pBind :: Parser String
@@ -116,11 +120,22 @@ parseArrowType = do
     return $ Pi freshVar t1 t2
 
 parseStatement :: Parser Expr
-parseStatement = try parseExpr <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition
+parseStatement = try parseInductive <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition <|> try parseExpr
 
+-- statementSeparator :: Parser ()
+-- statementSeparator = void (symbol ";") <|> void newline
+-- statementSeparator :: Parser ()
+-- statementSeparator = choice
+--   [ void (symbol ";")
+--   , void (symbol ".")
+--   , void (some (try (lexeme newline)))  -- whitespace-tolerant newlines
+--   ]
 statementSeparator :: Parser ()
-statementSeparator = void (symbol ";") <|> void newline
-
+statementSeparator = choice
+  [ void (symbol ";")
+  , void (symbol ".")
+  , skipSome (try eol)
+  ]
 parseProgram :: Parser [Expr]
 parseProgram = spaceConsumer *> sepEndBy parseStatement statementSeparator <* eof
 
@@ -142,7 +157,7 @@ parseSimpleTerm = try parseSpine <|> parseAtom
 parseBinOp :: Parser Expr
 parseBinOp = do
     a <- parseAtom <|> parseSpine
-    _ <- symbol "+"
+    _ <- symbol "+" -- TODO: support for /,-,*
     b <- parseExpr
     return $ BinOp a b
 
@@ -154,6 +169,32 @@ parseAtom = choice
     , boolean
     , between (symbol "(") (symbol ")") parseExpr
     ]
+
+parseInductive :: Parser Expr
+parseInductive = do
+    reservedWord "data"
+    name <- identifier
+    _ <- symbol ":"
+    t <- parseAtom
+    reservedWord "where"
+    matchBranches <- manyTill parseMatchBranches (lookAhead (void (symbol ".") <|> void parseStatementStart))
+    return $ Inductive name t matchBranches
+
+
+parseStatementStart :: Parser ()
+parseStatementStart = choice
+    [ void (reservedWord "define")
+    , void (reservedWord "let")
+    , void (reservedWord "data")
+    ]
+
+parseMatchBranches :: Parser (String, Expr)
+parseMatchBranches = do
+    _ <- symbol "|"
+    id <- identifier
+    _ <- symbol ":"
+    t <- try parseArrowType <|> parseAtom
+    return $ (id, t)
 
 integer :: Parser Expr
 integer = do

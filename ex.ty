@@ -2,9 +2,14 @@ define A : Type 0;
 define x : A;
 
 define Int : Type 0;
+
 let foo : Int = 10;
 
 let baz : A = x;
 
 let f : A -> A = \a : A . a;
-f baz;
+
+data nat : A where
+| zero : nat
+| suc : nat -> nat
+.
