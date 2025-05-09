@@ -2,6 +2,7 @@ module Subst where
 
 import           Control.Monad.State
 import           Data.Maybe          (fromMaybe)
+import           Debug.Trace         (trace)
 import           Expr                (Expr (..))
 import           Shared
 
@@ -9,6 +10,7 @@ type Substition = [(String, Expr)]
 
 subst :: Substition -> Expr -> State Integer Expr
 subst s (Var x) = return $ fromMaybe (Var x) (lookup x s)
+subst _ (BaseType t) = return $ BaseType t
 subst _ (Universe k) = return $ Universe k
 subst s (Pi x a b) = substAbstraction s (x, a, b) >>= \(x', a', b') -> return (Pi x' a' b')
 subst s (Lambda x a b) = substAbstraction s (x, a, b) >>= \(x', a', b') -> return (Lambda x' a' b')
@@ -20,6 +22,8 @@ subst s (App e1 e2) = do
     e1' <- subst s e1
     e2' <- subst s e2
     return (App e1' e2')
+subst x y                                 =
+       trace ("(SUBSTITUTION) unimplemented code: " ++ show x ++ " " ++ show y) $ error "unimplemented code."
 
 substAbstraction :: Substition -> (String, Expr, Expr) -> State Integer (String, Expr, Expr)
 substAbstraction s (x, t, e) = do

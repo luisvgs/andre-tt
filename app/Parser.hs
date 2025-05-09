@@ -33,6 +33,8 @@ reservedWords = ["define",
                  "Type",
                  "where",
                  "match",
+                 "list",
+                 "map",
                  "data"]
 
 reservedWord :: String -> Parser ()
@@ -71,7 +73,7 @@ parseLet = do
     reservedWord "let"
     x <- identifier
     _ <- symbol ":"
-    a <- try parseArrowType <|> parseAtom
+    a <- try parseType
     _ <- symbol "="
     t <- parseExpr
     u <- parseExpr
@@ -82,7 +84,7 @@ parseLetDefinition = do
     reservedWord "let"
     x <- identifier
     _ <- symbol ":"
-    a <- try parseArrowType <|> parseAtom
+    a <- try parseType
     _ <- symbol "="
     t <- parseExpr
     pure $ Let x a t (Var x)
@@ -111,25 +113,24 @@ parseUniverse = do
     _ <- reservedWord "Type"
     Universe <$> L.decimal
 
+parseType :: Parser Expr
+parseType = parseArrowType
+
 parseArrowType :: Parser Expr
 parseArrowType = do
-    t1 <- parseAtom
-    _ <- symbol "->"
-    t2 <- parseAtom
-    let freshVar = "_x"
-    return $ Pi freshVar t1 t2
+    t1 <- parseTypeAtom
+    option t1 $ do
+        _ <- symbol "->"
+        t2 <- parseArrowType
+        let freshVar = "_x"
+        return $ Pi freshVar t1 t2
+
+parseTypeAtom :: Parser Expr
+parseTypeAtom = try parseListType <|> parseUniverse <|> parseVariable <|> between (symbol "(") (symbol ")") parseType
 
 parseStatement :: Parser Expr
 parseStatement = try parseInductive <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition <|> try parseExpr
 
--- statementSeparator :: Parser ()
--- statementSeparator = void (symbol ";") <|> void newline
--- statementSeparator :: Parser ()
--- statementSeparator = choice
---   [ void (symbol ";")
---   , void (symbol ".")
---   , void (some (try (lexeme newline)))  -- whitespace-tolerant newlines
---   ]
 statementSeparator :: Parser ()
 statementSeparator = choice
   [ void (symbol ";")
@@ -140,7 +141,7 @@ parseProgram :: Parser [Expr]
 parseProgram = spaceConsumer *> sepEndBy parseStatement statementSeparator <* eof
 
 parseExpr :: Parser Expr
-parseExpr = parseTerm
+parseExpr = parseTerm <|> parseMap
 
 parseTerm :: Parser Expr
 parseTerm = do
@@ -148,8 +149,7 @@ parseTerm = do
 
     option first $ do
         _ <- symbol "+"
-        second <- parseTerm
-        return $ BinOp first second
+        BinOp first <$> parseTerm
 
 parseSimpleTerm :: Parser Expr
 parseSimpleTerm = try parseSpine <|> parseAtom
@@ -165,6 +165,7 @@ parseAtom :: Parser Expr
 parseAtom = choice
     [ parseVariable
     , parseUniverse
+    , parseList
     , integer
     , boolean
     , between (symbol "(") (symbol ")") parseExpr
@@ -205,3 +206,27 @@ boolean :: Parser Expr
 boolean = do
     value <- choice [reservedWord "True" *> pure True, reservedWord "False" *> pure False]
     return (BaseType (Boolean value))
+
+parseListType :: Parser Expr
+parseListType  = do
+    elementType <- parseAtom
+    _ <- reservedWord "list"
+    return $ App (Var "list") elementType
+
+parseList :: Parser Expr
+parseList = do
+    _ <- symbol "["
+    elements <- sepBy parseExpr (symbol ",")
+    _ <- symbol "]"
+
+    if null elements
+        then return $ List (Var "Dummy") []
+        else return $ List (Var "Dummy") elements
+
+
+parseMap :: Parser Expr
+parseMap = do
+    _ <- reservedWord "map"
+    f <- parseAtom
+    xs <- parseAtom
+    return $ Map f xs

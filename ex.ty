@@ -17,3 +17,17 @@ data nat : A where
 let z : nat = zero;
 let one : nat = suc zero;
 let two : nat = suc (suc zero);
+
+let intList : Int list = [1, 2, 3];
+let flist : Int -> Int list = \xs : Int . [3,2];
+
+
+let inc : Int -> Int = \x : Int . x + 1;
+let nums : Int list = [1, 2, 3, 4];
+
+let doubledNums : Int list = map (\x : Int . 8 + x) nums;
+
+let addTen : Int -> Int = \x : Int . x + 10;
+let numsWithTen : Int list = map addTen (map inc nums);
+
+let addexplicit : Int list = map addTen [3,4,2];

@@ -30,15 +30,20 @@ getCommand ":f" = TypeCheckFile
 getCommand ":c" = Ctx
 getCommand _    = Continue
 
-------------------
+----------------------------------------------------------------------------------------------------------
 -- TODO: REPL(?): evaluator.
 -- TODO: Inductive types, match statements, prelude types (Int, Bool) + support for operations
-------------------
+----------------------------------------------------------------------------------------------------------
+-- FIXME: arrow types with lists are broken.
+-- e.g `let flist : Int -> Int list = \xs : Int . 32;` wont work
+----------------------------------------------------------------------------------------------------------
+
 
 main :: IO ()
 main = evalStateT repl (Repl
-    [ ("A", (Universe 0, Nothing))    -- A is a type
-    , ("x", (Var "A", Nothing))       -- x has type A
+    [ ("A", (Universe 0, Nothing))    -- A : Type
+    , ("x", (Var "A", Nothing))       -- x has type A, or x ∈ A
+    , ("list", (Pi "A" (Universe 0) (Universe 0), Nothing)) -- list : ∀A: Type -> Type
     ] [] 0)
 
 repl :: ReplState ()

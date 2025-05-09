@@ -136,11 +136,46 @@ infer (Let x t e1 e2) = do
 
     if isSubtype ctx subctx t1 t
        then do
-         trace ("Types match, extending context") $ return ()
+         trace "Types match, extending context" $ return ()
          let newCtx = extend x t (Just e1) ctx
          put replState { context = newCtx }
          infer e2
        else error $ "Type mismatch in let expression: " ++ show t ++ " and " ++ show t1 ++ " are not equal."
+infer (List _ []) = return $ error "Empty lists require type annotations"
+infer (List _ (first:rest)) = do
+    elementType <- infer first
+
+    forM_ rest $ \element -> do
+        elemType <- infer element
+        replState <- get
+        let ctx = context replState
+        let subctx = subtype replState
+
+        unless (isSubtype ctx subctx elemType elementType) $
+            error $ "List elements must have the same type. Expected " ++
+                   show elementType ++ " but got " ++ show elemType
+
+    return $ App (Var "list") elementType
+infer (Map f xs) = do
+    replState <- get
+    let ctx = context replState
+    let subctx = subtype replState
+
+    f' <- infer f
+    xs' <- infer xs
+
+    case xs' of
+        App (Var "list") elemType -> do -- check if xs is an interable list of A
+            case f' of
+                Pi _ inType outType -> do -- if so, check that f' has type ∏_: A -> B
+                    if isSubtype ctx subctx elemType inType -- check if list type is a substype of f input type..
+                       then do
+                        return $ App (Var "list") outType -- If correct, return [B]
+                    else error $ "Type mismatch in map: function expects " ++
+                                    show inType ++ " but list elements have type " ++
+                                    show elemType
+                _ -> error $ "Map requires a function, but got: " ++ show f'
+        _ -> error $ "Map can only be applied to lists, but got: " ++ show xs'
 infer x                                 =
        trace ("(INFERENCE) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
 
@@ -214,6 +249,18 @@ normalize ctx (Inductive name ty constructors) =
     let ty' = normalize ctx ty
         constructors' = [ (cname, normalize ctx ctype) | (cname, ctype) <- constructors ]
     in Inductive name ty' constructors'
+normalize ctx (List ty elements) =
+    let ty' = normalize ctx ty
+        elements' = map (normalize ctx) elements
+    in List ty' elements
+normalize ctx (Map f xs) =
+    let f' = normalize ctx f
+        xs' = normalize ctx xs
+    in case xs' of
+        List elemType elems ->
+            let results = map (\e -> normalize ctx (App f' e)) elems
+            in List elemType results
+        _ -> Map f' xs'
 normalize ctx x                                 =
        trace ("(NORMALIZATION) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
 --NOTE: keep just in case

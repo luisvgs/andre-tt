@@ -1,7 +1,8 @@
 {-# LANGUAGE GADTs #-}
 module Expr where
 
-import           BaseType (BaseType (..))
+import           BaseType  (BaseType (..))
+import           Data.List (intercalate)
 
 data Expr where
     Var        :: String -> Expr
@@ -16,6 +17,8 @@ data Expr where
     Subtype :: Expr -> Expr -> Expr
     BinOp :: Expr -> Expr -> Expr
     Inductive :: String -> Expr -> [(String, Expr)] -> Expr -- data N : U where | n : N -> N | z : N
+    List :: Expr -> [Expr] -> Expr
+    Map :: Expr -> Expr -> Expr
     Dummy      :: Expr deriving (Eq)
 
 instance Show Expr where
@@ -36,4 +39,6 @@ instance Show Expr where
         (Integer a) -> show a
         (Boolean b) -> show b
     show (BinOp a b) = show a ++ " " ++ show b
-    show Dummy = "Dummy"
+    show (Map f xs) = "map " ++ show f ++ " " ++ show xs
+    show (List ty elements) = "[" ++ intercalate ", " (map show elements)++ "]"
+    show Dummy = ""
