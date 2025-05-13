@@ -32,7 +32,8 @@ getCommand _    = Continue
 
 ----------------------------------------------------------------------------------------------------------
 -- TODO: REPL(?): evaluator.
--- TODO: Inductive types, match statements, prelude types (Int, Bool) + support for operations
+-- Inductive types, match statements, prelude types (Int, Bool) + support for operations
+-- Improve printing results in console. Conditionally allow debugging with a flag?
 ----------------------------------------------------------------------------------------------------------
 -- FIXME: arrow types with lists are broken.
 -- e.g `let flist : Int -> Int list = \xs : Int . 32;` wont work

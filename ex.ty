@@ -1,3 +1,4 @@
+-- type definition
 define A : Type 0;
 define x : A;
 
@@ -9,6 +10,7 @@ let baz : A = x;
 
 let f : A -> A = \a : A . a;
 
+-- inductive type introduction
 data nat : A where
 | zero : nat
 | suc : nat -> nat
@@ -18,6 +20,7 @@ let z : nat = zero;
 let one : nat = suc zero;
 let two : nat = suc (suc zero);
 
+-- list operations
 let intList : Int list = [1, 2, 3];
 let flist : Int -> Int list = \xs : Int . [3,2];
 

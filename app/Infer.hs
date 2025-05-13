@@ -263,12 +263,6 @@ normalize ctx (Map f xs) =
         _ -> Map f' xs'
 normalize ctx x                                 =
        trace ("(NORMALIZATION) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
---NOTE: keep just in case
--- normalize ctx (App e1 e2)                        =
---         let e2'                                  = normalize ctx e2
---         in case normalize ctx e1 of
---              Lambda x _ e1' -> normalize ctx (evalState (subst [(x, e2')] e1') 0)
---              e1'            -> App e1' e2'
 
 normalizeAbstraction :: Context -> (String, Expr, Expr) -> (String, Expr, Expr)
 normalizeAbstraction ctx (x, t, e)               =
