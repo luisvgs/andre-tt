@@ -270,3 +270,21 @@ normalizeAbstraction ctx (x, t, e)               =
         ctx'                                     = extend x t' Nothing ctx
         e'                                       = normalize ctx' e
     in (x, t', e')
+
+
+check :: Expr -> Expr -> State Repl ()
+check (Lambda x t e) (Pi x' t1 t2) = do
+    replState <- get
+    let ctx                                      = context replState
+    if equal ctx t t1
+       then do
+        let ctx' = extend x' t1 Nothing ctx
+        put replState { context = ctx' }
+        check e t2
+    else error "Lambda argument type doesn't match"
+check expr ty = do
+    inferred <- infer expr
+    ctx <- gets context
+    subctx <- gets subtype
+    unless (isSubtype ctx subctx inferred ty) $
+        error $ "Type mismatch: expected " ++ show ty ++ ", but got " ++ show inferred

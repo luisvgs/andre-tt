@@ -34,3 +34,7 @@ let addTen : Int -> Int = \x : Int . x + 10;
 let numsWithTen : Int list = map addTen (map inc nums);
 
 let addexplicit : Int list = map addTen [3,4,2];
+
+-- Top-level type definition
+let addTwo: Int -> Int
+addTwo = \x : Int . x + 2;

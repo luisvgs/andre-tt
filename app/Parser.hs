@@ -33,6 +33,7 @@ reservedWords = ["define",
                  "Type",
                  "where",
                  "match",
+                 "with",
                  "list",
                  "map",
                  "data"]
@@ -129,7 +130,8 @@ parseTypeAtom :: Parser Expr
 parseTypeAtom = try parseListType <|> parseUniverse <|> parseVariable <|> between (symbol "(") (symbol ")") parseType
 
 parseStatement :: Parser Expr
-parseStatement = try parseInductive <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition <|> try parseExpr
+parseStatement = try parseInductive <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition <|> try parseFunctionDeclarationWithImplementation
+    <|> try parseExpr
 
 statementSeparator :: Parser ()
 statementSeparator = choice
@@ -181,11 +183,18 @@ parseInductive = do
     matchBranches <- manyTill parseMatchBranches (lookAhead (void (symbol ".") <|> void parseStatementStart))
     return $ Inductive name t matchBranches
 
+-- parseMatchStatement :: Parser ()
+-- parseMatchStatement = do
+--     reservedWord "match"
+--     id <- parseAtom
+--     reservedWord "with"
+--     matchBranches <- manyTill parseMatchBranches (lookAhead (void (symbol ".") <|> void parseStatementStart))
 
 parseStatementStart :: Parser ()
 parseStatementStart = choice
     [ void (reservedWord "define")
     , void (reservedWord "let")
+    , void (reservedWord "match")
     , void (reservedWord "data")
     ]
 
@@ -230,3 +239,28 @@ parseMap = do
     f <- parseAtom
     xs <- parseAtom
     return $ Map f xs
+
+parseFunctionDeclaration :: Parser (String, Expr)
+parseFunctionDeclaration = do
+    _ <- reservedWord "let"
+    name <- identifier
+    _ <- symbol ":"
+    t <- parseType
+    pure (name, t)
+
+parseFunctionDeclarationWithBody :: Parser (String, Expr)
+parseFunctionDeclarationWithBody = do
+    name <- identifier
+    _ <- symbol "="
+    expr <- parseExpr
+    pure (name, expr)
+
+parseFunctionDeclarationWithImplementation :: Parser Expr
+parseFunctionDeclarationWithImplementation = do
+    (declName, typeExpr) <- parseFunctionDeclarationWithBody
+    statementSeparator
+    (implName, body) <- parseFunctionDeclarationWithBody
+
+    if implName == declName
+        then return $ Let declName typeExpr body (Var declName)
+        else fail $ "Function name mismatch: expected " ++ declName ++ " but got " ++ implName
