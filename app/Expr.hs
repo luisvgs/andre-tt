@@ -17,6 +17,7 @@ data Expr where
     Subtype :: Expr -> Expr -> Expr
     BinOp :: Expr -> Expr -> Expr
     Inductive :: String -> Expr -> [(String, Expr)] -> Expr -- data N : U where | n : N -> N | z : N
+    Match :: Expr -> [(Expr, Expr)] -> Expr
     List :: Expr -> [Expr] -> Expr
     Map :: Expr -> Expr -> Expr
     Dummy      :: Expr deriving (Eq)
@@ -31,6 +32,7 @@ instance Show Expr where
     show (Definition s e) = s ++ " : " ++ show e
     show (Let x t e u) = "let " ++ x ++ " : " ++ show t ++ " = " ++ show e ++ "; " ++ show u
     show (Universe k) = "Type" ++ show k
+    show (Match c b) = "match "
     show (Pi x t e) = "Pi (" ++ x ++ " : " ++ show t ++ ") -> " ++ show e
     show (Lambda x t e) = "\\(" ++ x ++ " : " ++ show t ++ ") -> " ++ show e
     show (App e1 e2) = "(" ++ show e1 ++ " " ++ show e2 ++ ")"

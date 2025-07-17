@@ -130,7 +130,7 @@ parseTypeAtom :: Parser Expr
 parseTypeAtom = try parseListType <|> parseUniverse <|> parseVariable <|> between (symbol "(") (symbol ")") parseType
 
 parseStatement :: Parser Expr
-parseStatement = try parseInductive <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition <|> try parseFunctionDeclarationWithImplementation
+parseStatement = try parseMatchStatement <|> try parseInductive <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition <|> try parseFunctionDeclarationWithImplementation
     <|> try parseExpr
 
 statementSeparator :: Parser ()
@@ -182,13 +182,6 @@ parseInductive = do
     reservedWord "where"
     matchBranches <- manyTill parseMatchBranches (lookAhead (void (symbol ".") <|> void parseStatementStart))
     return $ Inductive name t matchBranches
-
--- parseMatchStatement :: Parser ()
--- parseMatchStatement = do
---     reservedWord "match"
---     id <- parseAtom
---     reservedWord "with"
---     matchBranches <- manyTill parseMatchBranches (lookAhead (void (symbol ".") <|> void parseStatementStart))
 
 parseStatementStart :: Parser ()
 parseStatementStart = choice
@@ -264,3 +257,21 @@ parseFunctionDeclarationWithImplementation = do
     if implName == declName
         then return $ Let declName typeExpr body (Var declName)
         else fail $ "Function name mismatch: expected " ++ declName ++ " but got " ++ implName
+
+
+parseMatchStatement :: Parser Expr
+parseMatchStatement = do
+    _ <- reservedWord "match"
+    a <- parseAtom
+    _ <- reservedWord "with"
+    matchBranches <- manyTill parseMatchStmtBranches (lookAhead (void (symbol ".") <|> void parseStatementStart))
+    return $ Match a matchBranches
+
+
+parseMatchStmtBranches :: Parser (Expr, Expr)
+parseMatchStmtBranches = do
+    _ <- symbol "|"
+    a <- parseAtom
+    _ <- symbol "->"
+    t <- try parseAtom
+    return (a, t)

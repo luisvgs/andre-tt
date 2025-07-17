@@ -176,6 +176,25 @@ infer (Map f xs) = do
                                     show elemType
                 _ -> error $ "Map requires a function, but got: " ++ show f'
         _ -> error $ "Map can only be applied to lists, but got: " ++ show xs'
+infer (Match e branches) = do
+    e' <- infer e
+    replState <- get
+    branchTypes <- forM_ branches $ \(cond, ret) -> do
+        cond' <- infer cond
+        unless(equal replState cond' e') $
+            throwError $ "Pattern must match the type you are matching against."
+
+        infer ret
+
+    case branchTypes of
+        [] -> throwError "Empty branches are not allowed."
+        (ht:tt) -> do
+            forM_ tt $ \branchType ->
+                unless (equal replState ht branchType) $
+                throwError $
+
+
+    return $ Match e branches
 infer x                                 =
        trace ("(INFERENCE) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
 
