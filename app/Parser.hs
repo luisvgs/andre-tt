@@ -36,6 +36,8 @@ reservedWords = ["define",
                  "with",
                  "list",
                  "map",
+                 "True",
+                 "False",
                  "data"]
 
 reservedWord :: String -> Parser ()
@@ -170,6 +172,7 @@ parseAtom = choice
     , parseList
     , integer
     , boolean
+    , parseMatchStatement
     , between (symbol "(") (symbol ")") parseExpr
     ]
 
@@ -267,11 +270,15 @@ parseMatchStatement = do
     matchBranches <- manyTill parseMatchStmtBranches (lookAhead (void (symbol ".") <|> void parseStatementStart))
     return $ Match a matchBranches
 
-
+parseWildcard :: Parser Expr
+parseWildcard = do
+   _ <- symbol "_"
+   return $ Var "_"
+    
 parseMatchStmtBranches :: Parser (Expr, Expr)
 parseMatchStmtBranches = do
     _ <- symbol "|"
-    a <- parseAtom
+    a <- try parseWildcard <|> parseAtom
     _ <- symbol "->"
-    t <- try parseAtom
+    t <- parseAtom
     return (a, t)

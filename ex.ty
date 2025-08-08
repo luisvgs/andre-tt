@@ -3,6 +3,7 @@ define A : Type 0;
 define x : A;
 
 define Int : Type 0;
+define Bool: Type 0;
 
 let foo : Int = 10;
 
@@ -36,7 +37,7 @@ let numsWithTen : Int list = map addTen (map inc nums);
 let addexplicit : Int list =
     map addTen [3,4,2];
 
-match 2 with
-      | 2 -> true
-      | 3 -> false
-.
+match addexplicit with -- match against the value, not the type
+       | [13, 14, 12] -> True
+       | _ -> True
+ .

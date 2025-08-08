@@ -65,7 +65,7 @@ infer (Definition id ty)                         = do
     put replState { context                      = newCtx }
     return $ Definition id ty
 infer (BaseType (Integer n))                     = return $ Var "Int"
-infer (BaseType (Boolean b))                     =  return $ BaseType (Boolean b)
+infer (BaseType (Boolean b))                     =  return $ Var "Bool"
 infer (Universe k)                               = return $ Universe ( k + 1 )
 infer (BinOp (BaseType (Integer a)) (BaseType (Integer b)))= infer (BaseType (Integer (a + b)))
 infer (BinOp e1 e2)= do
@@ -179,22 +179,30 @@ infer (Map f xs) = do
 infer (Match e branches) = do
     e' <- infer e
     replState <- get
-    branchTypes <- forM_ branches $ \(cond, ret) -> do
-        cond' <- infer cond
-        unless(equal replState cond' e') $
-            throwError $ "Pattern must match the type you are matching against."
+    let ctx = context replState
+    let subctx = subtype replState
 
-        infer ret
+    trace ("expression matching against BEFORE " ++ show e) $ return ()
+    trace ("expression matching against " ++ show e') $ return ()
+    branchTypes <- mapM (\(cond, ret) -> do
+        case cond of
+            Var "_" -> infer ret
+            _ -> do
+                cond' <- infer cond
+                unless (equal ctx cond' e') $
+                    error "Pattern must match the type you are matching against"
+                infer ret
+        ) branches
 
     case branchTypes of
-        [] -> throwError "Empty branches are not allowed."
+        [] -> error "Empty branches are not allowed."
         (ht:tt) -> do
             forM_ tt $ \branchType ->
-                unless (equal replState ht branchType) $
-                throwError $
+                unless (equal ctx ht branchType) $
+                    error $ "All branches must have the same type. Expected " ++
+                           show ht ++ " but got " ++ show branchType
 
-
-    return $ Match e branches
+            return ht
 infer x                                 =
        trace ("(INFERENCE) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
 
@@ -280,8 +288,31 @@ normalize ctx (Map f xs) =
             let results = map (\e -> normalize ctx (App f' e)) elems
             in List elemType results
         _ -> Map f' xs'
+normalize ctx (Match e branches) =
+   let e' = normalize ctx e
+       branches' = [(normalize ctx cond, normalize ctx ret) | (cond, ret) <- branches]
+   in case findMatchingBranch e' branches' of
+       Just res -> res
+       Nothing -> Match e' branches'
 normalize ctx x                                 =
        trace ("(NORMALIZATION) unhandled expression: " ++ show x) $ error "Caught unsupported expression."
+
+findMatchingBranch :: Expr -> [(Expr, Expr)] -> Maybe Expr
+findMatchingBranch _ [] = Nothing
+findMatchingBranch e ((Var "_", ret) : _) = Just ret
+findMatchingBranch e ((cond, ret) : rest)
+    | expressionEqual e cond = Just ret
+    | otherwise = findMatchingBranch e rest
+
+expressionEqual :: Expr -> Expr -> Bool
+expressionEqual (BaseType (Integer a)) (BaseType (Integer b)) = a == b
+expressionEqual (BaseType (Boolean a)) (BaseType (Boolean b)) = a == b
+expressionEqual (Var a) (Var b) = a == b
+expressionEqual (List _ elems1) (List _ elems2) =
+    length elems1 == length elems2 &&
+    all (uncurry expressionEqual) (zip elems1 elems2)
+expressionEqual (Universe a) (Universe b) = a == b
+expressionEqual _ _ = False
 
 normalizeAbstraction :: Context -> (String, Expr, Expr) -> (String, Expr, Expr)
 normalizeAbstraction ctx (x, t, e)               =

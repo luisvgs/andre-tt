@@ -28,6 +28,7 @@ executable mini-dt
     other-modules: Parser, Expr, BaseType, Infer, Subst, Shared
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
-    build-depends:    base ^>=4.16.4.0, mtl ^>=2.2.2, megaparsec >= 9.0, text, containers, parser-combinators
+    -- build-depends:    base ^>=4.16.4.0, mtl ^>=2.2.2, megaparsec >= 9.0, text, containers, parser-combinators
+    build-depends:    base >=4.16.4.0 && <5, mtl ^>=2.2.2, megaparsec >= 9.0, text, containers, parser-combinators
     hs-source-dirs:   app
     default-language: Haskell2010
