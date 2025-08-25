@@ -13,7 +13,7 @@ import           Text.Megaparsec.Char           (alphaNumChar, eol, letterChar,
                                                  newline, space1, string)
 import qualified Text.Megaparsec.Char.Lexer     as L
 import           Text.Megaparsec.Char.Lexer     (space)
-import           Text.Megaparsec.Debug
+import Text.Megaparsec.Debug (dbg)
 
 type Parser = Parsec Void String
 
@@ -72,7 +72,7 @@ parseDefinition = do
     return $ Definition id ty
 
 parseLet :: Parser Expr
-parseLet = do
+parseLet =  do
     reservedWord "let"
     x <- identifier
     _ <- symbol ":"
@@ -86,6 +86,7 @@ parseLetDefinition :: Parser Expr
 parseLetDefinition = do
     reservedWord "let"
     x <- identifier
+    args <- many identifier
     _ <- symbol ":"
     a <- try parseType
     _ <- symbol "="
@@ -132,7 +133,7 @@ parseTypeAtom :: Parser Expr
 parseTypeAtom = try parseListType <|> parseUniverse <|> parseVariable <|> between (symbol "(") (symbol ")") parseType
 
 parseStatement :: Parser Expr
-parseStatement = try parseMatchStatement <|> try parseInductive <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition <|> try parseFunctionDeclarationWithImplementation
+parseStatement = dbg "Debug statement" $ try parseMatchStatement <|> try parseInductive <|> try parseDefinition <|> try parseSubtype <|> try parseLetDefinition <|> try parseFunctionDeclarationWithImplementation
     <|> try parseExpr
 
 statementSeparator :: Parser ()

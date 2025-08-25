@@ -22,6 +22,13 @@ subst s (App e1 e2) = do
     e1' <- subst s e1
     e2' <- subst s e2
     return (App e1' e2')
+subst s (Match e branches) = do
+  e' <- subst s e
+  bs' <- forM branches $ \(cond, ret) -> do
+           cond' <- subst s cond
+           ret'  <- subst s ret
+           pure (cond', ret')
+  pure (Match e' bs')
 subst x y                                 =
        trace ("(SUBSTITUTION) unimplemented code: " ++ show x ++ " " ++ show y) $ error "unimplemented code."
 

@@ -37,7 +37,9 @@ let numsWithTen : Int list = map addTen (map inc nums);
 let addexplicit : Int list =
     map addTen [3,4,2];
 
-match addexplicit with -- match against the value, not the type
-       | [13, 14, 12] -> True
-       | _ -> True
+let f : Int -> Bool = \m : Int . match m with
+       | 3 -> True
+       | _ -> False
  .
+
+f 4

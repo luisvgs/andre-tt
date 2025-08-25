@@ -128,16 +128,11 @@ infer (Let x t e1 e2) = do
     let ctx = context replState
     let subctx = subtype replState
 
-    trace ("Let expression: " ++ show x ++ " : " ++ show t ++ " = " ++ show e1) $ return ()
-
     t1 <- infer e1
-    trace ("Declared type: " ++ show t) $ return ()
-    trace ("Inferred type of expression: " ++ show t1) $ return ()
 
     if isSubtype ctx subctx t1 t
        then do
-         trace "Types match, extending context" $ return ()
-         let newCtx = extend x t (Just e1) ctx
+         let newCtx = extend x t (Just ( normalize ctx e1 )) ctx
          put replState { context = newCtx }
          infer e2
        else error $ "Type mismatch in let expression: " ++ show t ++ " and " ++ show t1 ++ " are not equal."
@@ -182,8 +177,6 @@ infer (Match e branches) = do
     let ctx = context replState
     let subctx = subtype replState
 
-    trace ("expression matching against BEFORE " ++ show e) $ return ()
-    trace ("expression matching against " ++ show e') $ return ()
     branchTypes <- mapM (\(cond, ret) -> do
         case cond of
             Var "_" -> infer ret
@@ -231,7 +224,6 @@ getReturnType t             = Just t
 
 normalize :: Context -> Expr -> Expr
 normalize ctx (Var x)                            =
-    trace ("(DEBUG) looking for " ++ show x) $
     case lookupVal x ctx of
         Just (Just t) -> normalize ctx t -- NOTE: if there is a value, keep normalizing
         _             -> Var x -- NOTE: otherwise return the variable as it is
@@ -239,23 +231,19 @@ normalize ctx (Pi x t e)                         =
     let (x', t', e')                             = normalizeAbstraction ctx (x, t, e)
     in Pi x' t' e'
 normalize ctx (Lambda x t e)                     =
-    let (x', t', e')                             = normalizeAbstraction ctx (x, t, e)
-    in Lambda x' t' e'
+    let t'                             = normalize ctx t
+    in Lambda x t' e
 normalize ctx (Universe k)                       = Universe k
 normalize ctx (App e1 e2) =
-    trace ("(DEBUG) App case: applying " ++ show e1 ++ " to " ++ show e2) $
     let e1' = normalize ctx e1
         e2' = normalize ctx e2
     in case e1' of
         Lambda x _ body ->
-            trace ("(DEBUG) LAMBDA substituing " ++ show x ++ " for " ++ show e2' ++ " in " ++ show body) $
             normalize ctx (evalState (subst [(x, e2')] body) 0)
         _ ->
             case e1' of
                 Var f -> case lookupVal f ctx of
                     Just (Just (Lambda x _ body)) ->
-                        trace ("(DEBUG) case e1 Var " ++ show x ++ " with body " ++ show body) $
-                        trace ("(DEBUG) substituing " ++ show x ++ " for " ++ show e2' ++ "in " ++ show body) $
                         normalize ctx (evalState (subst [(x, e2')] body) 0)
                     _ -> App e1' e2'
                 _ -> App e1' e2'

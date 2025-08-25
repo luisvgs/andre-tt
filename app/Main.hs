@@ -65,30 +65,22 @@ repl                                         = do
         evalExpr :: Either (ParseErrorBundle String Void) [Expr] -> ReplState ()
         evalExpr (Left err) = liftIO $ putStrLn $ errorBundlePretty err
         evalExpr (Right exprs) = do
-            liftIO $ putStrLn $ "(DEBUG) original expressions to eat: " ++ show exprs
             replState <- get
-            liftIO $ putStrLn $ "(DEBUG) replState context: " ++ show (formatContext $ context replState)
 
             forM_ (init exprs) $ \expr -> do
                 currentState <- get
-                liftIO $ putStrLn $ "(DEBUG) current processing expr: " ++ show expr
                 let (inferredType, newState) = runState (infer expr) currentState
                 put newState
-                liftIO $ putStrLn $ "(DEBUG) Current inferred type: " ++ show inferredType
 
             unless (null exprs) $ do --NOTE: evaluate the last expression as the value of the whole program
                 currentState <- get
                 let lastExpr = last exprs
-                liftIO $ putStrLn $ "(DEBUG) Processing last expr: " ++ show lastExpr
                 let (inferredType, newState) = runState (infer lastExpr) currentState
                 put newState
 
                 Repl { context = ctx } <- get
-                liftIO $ putStrLn $ "(DEBUG) Final context: " ++ show (formatContext ctx)
 
-                liftIO $ putStrLn $ "(DEBUG) expr before normalization: " ++ show lastExpr
                 let normalizedExpr = normalize ctx lastExpr
-                liftIO $ putStrLn $ "(DEBUG) expr after normalization: " ++ show normalizedExpr
                 liftIO $ print $ show normalizedExpr
                 liftIO $ putStrLn $ "Type: " ++ show inferredType
 
