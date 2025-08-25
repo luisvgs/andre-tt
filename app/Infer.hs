@@ -80,29 +80,36 @@ infer (Pi x t1 t2)                               = do
     let k1                                       = runState (inferUniverse ctx subctx t1) replState
         k2                                       = runState(inferUniverse (extend x t1 Nothing ctx) subctx t2) replState
     return $ Universe (max ( fst k1 ) ( fst k2 ))
-infer (Lambda x t e)                             = do
+infer (Lambda x t e) = do
+    -- Error if lambda expr has no type annotation
+    when (t == Var "Dummy") $
+        error "Cannot infer type for an unannotated lambda; it must be checked against a function type."
+
     replState <- get
-    let ctx                                      = context replState
-        subctx                                   = subtype replState
-        _                                        = inferUniverse ctx subctx t
-        newCtx                                   = extend x t Nothing ctx
-    put replState { context                      = newCtx }
+    let ctx    = context replState
+        subctx = subtype replState
+
+    _ <- inferUniverse ctx subctx t
+
+    -- infer body under x : t
+    let newCtx = extend x t Nothing ctx
+    put replState { context = newCtx }
     te <- infer e
     return $ Pi x t te
-infer (App e1 e2)                                = do
+infer (App e1 e2) = do
     trace ("Application case: " ++ show e1 ++ " applied to " ++ show e2) $ return ()
     replState <- get
-    Repl { context                               = ctx, subtype = subctx, fresh = fresh} <- get
-    let (stateResult, _)                         = runState (inferPi ctx subctx e1) replState
-        (x, t1, t2)                              = stateResult
-    t1' <- infer e2
-    if isSubtype ctx subctx t1 t1'
-        then do
-            let (result, fresh')                 = runState (subst [(x, e2)] t2) fresh
-            put replState { fresh                = fresh' }
-            trace ("res " ++ show result) $ return ()
-            return result
-        else error $ "Couldn't match expected types: " ++ show t1 ++ " and " ++ show t1'
+    Repl { context = ctx, subtype = subctx, fresh = fresh } <- get
+
+    let (stateResult, _) = runState (inferPi ctx subctx e1) replState
+    let (x, t1, t2) = stateResult
+
+    check e2 t1
+
+    let (result, fresh') = runState (subst [(x, e2)] t2) fresh
+    put replState { fresh = fresh' }
+    trace ("res " ++ show result) $ return ()
+    return result
 infer (Inductive name ty constructors) = do
     replState <- get
     tyType <- infer ty -- check that ty is well-typed in universe Ui
@@ -125,17 +132,13 @@ infer (Inductive name ty constructors) = do
     return $ Inductive name ty constructors
 infer (Let x t e1 e2) = do
     replState <- get
-    let ctx = context replState
-    let subctx = subtype replState
+    let ctx    = context replState
 
-    t1 <- infer e1
+    check e1 t
 
-    if isSubtype ctx subctx t1 t
-       then do
-         let newCtx = extend x t (Just ( normalize ctx e1 )) ctx
-         put replState { context = newCtx }
-         infer e2
-       else error $ "Type mismatch in let expression: " ++ show t ++ " and " ++ show t1 ++ " are not equal."
+    let newCtx = extend x t (Just (normalize ctx e1)) ctx
+    put replState { context = newCtx }
+    infer e2
 infer (List _ []) = return $ error "Empty lists require type annotations"
 infer (List _ (first:rest)) = do
     elementType <- infer first
@@ -208,7 +211,7 @@ inferUniverse :: Context -> SubtypeContext -> Expr -> State Repl Int
 inferUniverse ctx subctx t                       = do
     replState <- get
     case normalize ctx (fst (runState (infer t) replState)) of
-        Universe k -> return $ k
+        Universe k -> return k
         _          -> error "Type expected"
 
 inferPi :: Context -> SubtypeContext -> Expr -> State Repl (String, Expr, Expr)
@@ -314,7 +317,7 @@ check :: Expr -> Expr -> State Repl ()
 check (Lambda x t e) (Pi x' t1 t2) = do
     replState <- get
     let ctx                                      = context replState
-    if equal ctx t t1
+    if t == Var "Dummy" || equal ctx t t1
        then do
         let ctx' = extend x' t1 Nothing ctx
         put replState { context = ctx' }

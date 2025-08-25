@@ -14,6 +14,7 @@ import           Text.Megaparsec.Char           (alphaNumChar, eol, letterChar,
 import qualified Text.Megaparsec.Char.Lexer     as L
 import           Text.Megaparsec.Char.Lexer     (space)
 import Text.Megaparsec.Debug (dbg)
+import           Data.Maybe          (fromMaybe)
 
 type Parser = Parsec Void String
 
@@ -82,16 +83,18 @@ parseLet =  do
     u <- parseExpr
     pure $ Let x a t u
 
-parseLetDefinition :: Parser Expr
+parseLetDefinition :: Parser Expr --TODO: definir diferencias con el parser de arriba?? :S
 parseLetDefinition = do
     reservedWord "let"
     x <- identifier
     args <- many identifier
     _ <- symbol ":"
-    a <- try parseType
+    t <- try parseType
     _ <- symbol "="
-    t <- parseExpr
-    pure $ Let x a t (Var x)
+    body <- parseExpr -- let body
+    let wrappedLambda =
+            foldr (\arg acc -> Lambda arg (Var "Dummy") acc) body args
+    pure $ Let x t wrappedLambda (Var x)
 
 pBind :: Parser String
 pBind = identifier <|> symbol "_"
@@ -106,11 +109,10 @@ parseLambda :: Parser Expr
 parseLambda = do
     symbol "\\"
     var <- identifier
-    _ <- symbol ":"
-    varType <- parseAtom
+    varType <- optional ( symbol ":" *> parseAtom)
     _ <- symbol "."
     body <- parseExpr
-    return $ Lambda var varType body
+    return $ Lambda var ( fromMaybe (Var "Dummy") varType ) body
 
 parseUniverse :: Parser Expr
 parseUniverse = do

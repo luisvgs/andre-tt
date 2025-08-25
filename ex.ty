@@ -31,15 +31,15 @@ let nums : Int list = [1, 2, 3, 4];
 
 let doubledNums : Int list = map (\x : Int . 8 + x) nums;
 
-let addTen : Int -> Int = \x : Int . x + 10;
+let addTen x : Int -> Int = x + 10;
 let numsWithTen : Int list = map addTen (map inc nums);
 
 let addexplicit : Int list =
     map addTen [3,4,2];
 
-let f : Int -> Bool = \m : Int . match m with
+let f m : Int -> Bool = match m with
        | 3 -> True
        | _ -> False
  .
 
-f 4
+f 3
