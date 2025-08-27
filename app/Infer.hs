@@ -67,13 +67,14 @@ infer (Definition id ty)                         = do
 infer (BaseType (Integer n))                     = return $ Var "Int"
 infer (BaseType (Boolean b))                     =  return $ Var "Bool"
 infer (Universe k)                               = return $ Universe ( k + 1 )
-infer (BinOp (BaseType (Integer a)) (BaseType (Integer b)))= infer (BaseType (Integer (a + b)))
-infer (BinOp e1 e2)= do
+-- infer (BinOp (BaseType (Integer a)) (BaseType (Integer b)))= infer (BaseType (Integer (a + b)))
+infer (BinOp e1 op e2)= do -- TODO should be a better (non-repetitive) way to handle this?
     t1 <- infer e1
     t2 <- infer e2
     case (t1, t2) of
         (Var "Int", Var "Int") -> return $ Var "Int"
-        _ -> error $ "Type mismatch in binary operation: " ++ show t1  ++ " and " ++ show t2
+        (Var "Bool", Var "Bool") -> return $ Var "Bool"
+        _ -> error $ "Type mismatch in binary operation: " ++ show t1  ++ " and " ++ show t2 ++ " " ++ "are not compatible types."
 infer (Pi x t1 t2)                               = do
     Repl { context                               = ctx, subtype = subctx } <- get
     replState <- get
@@ -251,13 +252,15 @@ normalize ctx (App e1 e2) =
                     _ -> App e1' e2'
                 _ -> App e1' e2'
 normalize ctx (BaseType a) = BaseType a
-normalize ctx (BinOp (BaseType (Integer a)) (BaseType (Integer b)))= BaseType (Integer (a + b))
-normalize ctx (BinOp a b) = do
+-- normalize ctx (BinOp (BaseType (Integer a)) (BaseType (Integer b)))= BaseType (Integer (a + b))
+normalize ctx (BinOp a op b) = do
     let a' = normalize ctx a
         b' = normalize ctx b
-    case (a', b') of
-        (BaseType (Integer aVal), BaseType (Integer bVal)) -> BaseType (Integer (aVal + bVal))
-        _ -> BinOp a' b'
+    case (a', op, b') of
+        (BaseType (Integer aVal), "+", BaseType (Integer bVal)) -> BaseType (Integer (aVal + bVal))
+        (BaseType (Integer aVal), "-", BaseType (Integer bVal)) -> BaseType (Integer (aVal - bVal))
+        (BaseType (Integer aVal), "<", BaseType (Integer bVal)) -> BaseType (Boolean (aVal < bVal))
+        _ -> BinOp a' op b'
 normalize ctx (Let x t e1 e2)                  =
     let e1' = normalize ctx e1
         ctx' = extend x t (Just e1') ctx

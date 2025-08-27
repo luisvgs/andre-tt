@@ -42,4 +42,13 @@ let f m : Int -> Bool = match m with
        | _ -> False
  .
 
-f 3
+f 3;
+
+let sum n : Int -> Int = n + 10;
+sum 30;
+
+let sub n : Int -> Int = n - 10;
+sub 20;
+
+let lessthan b : Int -> Bool = b < 20;
+lessthan 9;

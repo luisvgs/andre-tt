@@ -14,10 +14,10 @@ subst _ (BaseType t) = return $ BaseType t
 subst _ (Universe k) = return $ Universe k
 subst s (Pi x a b) = substAbstraction s (x, a, b) >>= \(x', a', b') -> return (Pi x' a' b')
 subst s (Lambda x a b) = substAbstraction s (x, a, b) >>= \(x', a', b') -> return (Lambda x' a' b')
-subst s (BinOp a b) = do
+subst s (BinOp a op b) = do
     a' <- subst s a
     b' <- subst s b
-    return (BinOp a' b')
+    return (BinOp a' op b')
 subst s (App e1 e2) = do
     e1' <- subst s e1
     e2' <- subst s e2

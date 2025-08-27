@@ -15,7 +15,7 @@ data Expr where
     BaseType :: BaseType -> Expr
     Definition  :: String -> Expr -> Expr
     Subtype :: Expr -> Expr -> Expr
-    BinOp :: Expr -> Expr -> Expr
+    BinOp :: Expr -> String -> Expr -> Expr
     Inductive :: String -> Expr -> [(String, Expr)] -> Expr -- data N : U where | n : N -> N | z : N
     Match :: Expr -> [(Expr, Expr)] -> Expr
     List :: Expr -> [Expr] -> Expr
@@ -40,7 +40,7 @@ instance Show Expr where
     show (BaseType t) = case t of
         (Integer a) -> show a
         (Boolean b) -> show b
-    show (BinOp a b) = show a ++ " " ++ show b
+    show (BinOp a op b) = show a ++ " " ++ show b
     show (Map f xs) = "map " ++ show f ++ " " ++ show xs
     show (List ty elements) = "[" ++ intercalate ", " (map show elements)++ "]"
     show Dummy = ""

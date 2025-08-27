@@ -155,18 +155,11 @@ parseTerm = do
     first <- try parseLet <|> try parseLambda <|> parseSimpleTerm
 
     option first $ do
-        _ <- symbol "+"
-        BinOp first <$> parseTerm
+        op <- symbol "+" <|> symbol "-" <|> symbol "<"
+        BinOp first op <$> parseTerm
 
 parseSimpleTerm :: Parser Expr
 parseSimpleTerm = try parseSpine <|> parseAtom
-
-parseBinOp :: Parser Expr
-parseBinOp = do
-    a <- parseAtom <|> parseSpine
-    _ <- symbol "+" -- TODO: support for /,-,*
-    b <- parseExpr
-    return $ BinOp a b
 
 parseAtom :: Parser Expr
 parseAtom = choice
